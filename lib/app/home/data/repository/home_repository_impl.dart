@@ -1,10 +1,10 @@
-import 'dart:developer' as dev;
 import 'package:dartz/dartz.dart';
 import 'package:zaptv/app/home/data/models/channel.dart';
 import 'package:zaptv/app/home/data/source/iptvorg_remote_datasource.dart';
 import 'package:zaptv/app/home/data/source/jiotvgo_remote_datasource.dart';
 import 'package:zaptv/app/home/domain/entities/channel.dart';
 import 'package:zaptv/app/home/domain/repository/home_repository.dart';
+import 'package:zaptv/core/services/talker_service.dart';
 import 'package:zaptv/core/shared/failures.dart';
 
 class HomeRepositoryImpl implements HomeRepository {
@@ -18,23 +18,23 @@ class HomeRepositoryImpl implements HomeRepository {
 
   @override
   Future<Either<Failure, List<ChannelEntity>>> getChannels() async {
-    dev.log('Starting getChannels request...', name: 'HomeRepositoryImpl');
+    talker.info('[Repository] Fetching channels from all sources...');
 
     List<Channel> jioChannels = [];
     List<Channel> iptvChannels = [];
 
     try {
       jioChannels = await jiotvGoRemoteDataSource.getAllChannels();
-      dev.log('JioTV data source returned ${jioChannels.length} channels', name: 'HomeRepositoryImpl');
-    } catch (e) {
-      dev.log('Error fetching JioTV channels: $e', name: 'HomeRepositoryImpl');
+      talker.info('[Repository] Received ${jioChannels.length} JioTV channels');
+    } catch (e, st) {
+      talker.handle(e, st, '[Repository] Error loading JioTV channels');
     }
 
     try {
       iptvChannels = await iptvRemoteDataSource.getAllPosts();
-      dev.log('IPTV-Org data source returned ${iptvChannels.length} channels', name: 'HomeRepositoryImpl');
-    } catch (e) {
-      dev.log('Error fetching IPTV-Org channels: $e', name: 'HomeRepositoryImpl');
+      talker.info('[Repository] Received ${iptvChannels.length} IPTV channels');
+    } catch (e, st) {
+      talker.handle(e, st, '[Repository] Error loading IPTV channels');
     }
 
     // Filter out any invalid/blank entries
@@ -42,7 +42,7 @@ class HomeRepositoryImpl implements HomeRepository {
     iptvChannels = iptvChannels.where(_isValid).toList();
 
     if (jioChannels.isEmpty && iptvChannels.isEmpty) {
-      dev.log('Both JioTV and IPTV-Org returned zero valid channels!', name: 'HomeRepositoryImpl');
+      talker.error('[Repository] Both sources returned zero valid channels!');
       return Left(Failure());
     }
 
@@ -63,9 +63,8 @@ class HomeRepositoryImpl implements HomeRepository {
 
     final List<ChannelEntity> result = [...jioEntities, ...iptvEntities];
 
-    dev.log(
-      'Channel collection complete (No deduplication). Total channels: ${result.length} (JioTV: ${jioEntities.length}, IPTV: ${iptvEntities.length})',
-      name: 'HomeRepositoryImpl',
+    talker.info(
+      '[Repository] Combined channel list ready. Total: ${result.length} (JioTV: ${jioEntities.length}, IPTV: ${iptvEntities.length})',
     );
 
     return Right(result);

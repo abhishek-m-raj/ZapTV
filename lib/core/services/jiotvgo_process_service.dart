@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:zaptv/core/ffi/jiotv_go_ffi.dart';
+import 'package:zaptv/core/services/talker_service.dart';
 
 /// Pure FFI manager for the JioTV-Go server.
 class JiotvGoProcessService {
@@ -22,16 +23,29 @@ class JiotvGoProcessService {
     _isStarting = true;
 
     try {
-      if (await isServerRunning()) return;
+      if (await isServerRunning()) {
+        talker.info('[JioTV FFI] Server is already running on $baseUrl');
+        return;
+      }
 
-      if (!_ffi.load()) return;
+      talker.info('[JioTV FFI] Loading shared library libjiotv_go...');
+      if (!_ffi.load()) {
+        talker.warning('[JioTV FFI] Failed to load libjiotv_go shared library');
+        return;
+      }
 
       final dataDir = await _getDataDir();
+      talker.info('[JioTV FFI] Starting JioTV-Go server with dataDir=$dataDir');
       final result = _ffi.startServer(port: '5001', dataDir: dataDir);
       if (result == 0) {
+        talker.info('[JioTV FFI] Server started successfully, waiting for port binding...');
         await Future.delayed(_startupWait);
+      } else {
+        final err = _ffi.getLastError();
+        talker.error('[JioTV FFI] Server start error: $err');
       }
-    } catch (_) {
+    } catch (e, st) {
+      talker.handle(e, st, '[JioTV FFI] Initialization failed');
     } finally {
       _isStarting = false;
     }

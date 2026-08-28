@@ -33,6 +33,7 @@ dependencies:
   media_kit_libs_video: ^1.0.4
   video_player: ^2.9.2
   wakelock_plus: ^1.2.1
+  talker_flutter: ^4.6.0
 
 dev_dependencies:
   flutter_test:

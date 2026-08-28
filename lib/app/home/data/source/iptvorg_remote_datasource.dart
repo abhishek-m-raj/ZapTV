@@ -1,25 +1,25 @@
-import 'dart:developer' as dev;
 import 'package:http/http.dart' as http;
 import 'package:m3u_nullsafe/m3u_nullsafe.dart';
 import 'package:zaptv/app/home/data/models/channel.dart';
+import 'package:zaptv/core/services/talker_service.dart';
 
 class IptvorgRemoteDataSource {
   IptvorgRemoteDataSource();
 
   Future<List<Channel>> getAllPosts() async {
-    dev.log('Fetching IPTV-Org channels...', name: 'IptvorgRemoteDataSource');
+    talker.info('[IPTV-Org] Fetching channel list...');
 
     try {
       final http.Response res = await http.get(
         Uri.parse("https://iptv-org.github.io/iptv/languages/mal.m3u"),
       ).timeout(const Duration(seconds: 10));
 
-      dev.log(
-        'IPTV-Org response status: ${res.statusCode}, body length: ${res.body.length}',
-        name: 'IptvorgRemoteDataSource',
+      talker.info(
+        '[IPTV-Org] Response status: ${res.statusCode}, length: ${res.body.length}',
       );
 
       if (res.statusCode != 200) {
+        talker.error('[IPTV-Org] HTTP request failed: status ${res.statusCode}');
         return [];
       }
 
@@ -46,17 +46,13 @@ class IptvorgRemoteDataSource {
         );
       }
 
-      dev.log(
-        'Successfully loaded ${data.length} valid IPTV-Org channels',
-        name: 'IptvorgRemoteDataSource',
+      talker.info(
+        '[IPTV-Org] Successfully loaded ${data.length} channels',
       );
 
       return data;
-    } catch (e) {
-      dev.log(
-        'Error fetching IPTV-Org channels: $e',
-        name: 'IptvorgRemoteDataSource',
-      );
+    } catch (e, st) {
+      talker.handle(e, st, '[IPTV-Org] Error fetching channels');
       return [];
     }
   }
