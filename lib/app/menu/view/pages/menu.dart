@@ -1,11 +1,14 @@
-import 'package:av_media_player/index.dart';
-import 'package:av_media_player/player.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:zaptv/app/home/domain/entities/channel.dart';
+import 'package:zaptv/app/menu/view/widgets/jiotv_login_dialog.dart';
+import 'package:zaptv/core/config/locator.dart';
+import 'package:zaptv/core/services/jiotvgo_process_service.dart';
+import 'package:zaptv/core/services/zap_video_controller.dart';
+import 'package:zaptv/core/widgets/zap_video_view.dart';
 
 class MenuPage extends StatefulWidget {
-  final AvMediaPlayer videoController;
+  final ZapVideoController videoController;
   final ChannelEntity currentChannel;
   final List<ChannelEntity> channels;
   final Function(ChannelEntity) onChannelSelected;
@@ -17,7 +20,7 @@ class MenuPage extends StatefulWidget {
     required this.currentChannel,
     required this.channels,
     required this.onChannelSelected,
-    required this.onPop
+    required this.onPop,
   });
 
   @override
@@ -27,26 +30,38 @@ class MenuPage extends StatefulWidget {
 class _MenuPageState extends State<MenuPage> {
   late final ScrollController _scrollController;
   late ChannelEntity currentChannel;
+  bool _isJioLoggedIn = false;
 
   @override
   void initState() {
     currentChannel = widget.currentChannel;
+    _checkJioLoginStatus();
     _scrollController = ScrollController(
       onAttach: (_) {
-        WidgetsBinding.instance.addPostFrameCallback(
-          (_) {
-            final double itemHeight = 70;
-            final int index = widget.channels.indexOf(widget.currentChannel);
-            _scrollController.animateTo(
-              itemHeight * index,
-              duration: Duration(milliseconds: 800),
-              curve: Curves.easeIn
-            );
-          }
-        );
-      }
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final double itemHeight = 70;
+          final int index = widget.channels.indexOf(widget.currentChannel);
+          _scrollController.animateTo(
+            itemHeight * index,
+            duration: const Duration(milliseconds: 800),
+            curve: Curves.easeIn,
+          );
+        });
+      },
     );
     super.initState();
+  }
+
+  Future<void> _checkJioLoginStatus() async {
+    try {
+      final service = loc<JiotvGoProcessService>();
+      final loggedIn = await service.isLoggedIn();
+      if (mounted) {
+        setState(() {
+          _isJioLoggedIn = loggedIn;
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -59,9 +74,33 @@ class _MenuPageState extends State<MenuPage> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(
-            "ZapTV"
-          ),
+          title: const Text("ZapTV"),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 12.0),
+              child: ElevatedButton.icon(
+                style: _isJioLoggedIn
+                    ? ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green.shade800,
+                        foregroundColor: Colors.white,
+                      )
+                    : null,
+                onPressed: () async {
+                  final result = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => const JiotvLoginDialog(),
+                  );
+                  if (result == true) {
+                    _checkJioLoginStatus();
+                  }
+                },
+                icon: Icon(_isJioLoggedIn ? Icons.check_circle : Icons.login),
+                label: Text(
+                  _isJioLoggedIn ? "JioTV: Logged In" : "JioTV Login",
+                ),
+              ),
+            ),
+          ],
         ),
         body: Padding(
           padding: EdgeInsets.all(15),
@@ -74,9 +113,7 @@ class _MenuPageState extends State<MenuPage> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(10),
                     color: Colors.transparent,
-                    border: Border.all(
-                      color: Colors.white
-                    )
+                    border: Border.all(color: Colors.white),
                   ),
                   child: ListView.separated(
                     controller: _scrollController,
@@ -98,7 +135,7 @@ class _MenuPageState extends State<MenuPage> {
                     },
                     separatorBuilder: (context, index) => SizedBox(height: 8),
                   ),
-                )
+                ),
               ),
               SizedBox(width: 8),
               Expanded(
@@ -107,26 +144,23 @@ class _MenuPageState extends State<MenuPage> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(10),
                     color: Theme.of(context).colorScheme.primaryContainer,
-                    border: Border.all(
-                      color: Colors.white
-                    )
+                    border: Border.all(color: Colors.white),
                   ),
                   child: Column(
                     children: [
                       AspectRatio(
                         aspectRatio: 16 / 9,
-                        child: AvMediaView(
-                          initPlayer: widget.videoController,
-                          initAutoPlay: true,
-                          initLooping: true,
+                        child: ZapVideoView(
+                          controller: widget.videoController,
+                          fit: BoxFit.cover,
                         ),
-                      )
+                      ),
                     ],
                   ),
-                )
-              )
+                ),
+              ),
             ],
-          )
+          ),
         ),
       ),
     );
@@ -142,7 +176,7 @@ class ChannelListTile extends StatefulWidget {
     super.key,
     required this.channel,
     required this.currentChannel,
-    required this.onTap
+    required this.onTap,
   });
 
   @override
@@ -157,7 +191,7 @@ class _ChannelListTileState extends State<ChannelListTile> {
     isFocused = false;
     super.initState();
   }
-  
+
   bool get isSelected => widget.channel == widget.currentChannel;
 
   @override
@@ -170,13 +204,17 @@ class _ChannelListTileState extends State<ChannelListTile> {
         focusColor: Theme.of(context).colorScheme.primaryContainer,
         contentPadding: EdgeInsets.all(8),
         onTap: widget.onTap,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         onFocusChange: (value) {
           setState(() {
             isFocused = value;
           });
+          Scrollable.ensureVisible(
+            context,
+            alignment: 0.5,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
         },
         leading: CachedNetworkImage(
           imageUrl: widget.channel.image,
@@ -184,25 +222,16 @@ class _ChannelListTileState extends State<ChannelListTile> {
             width: 80,
             height: 50,
             decoration: BoxDecoration(
-              image: DecorationImage(
-                image: imageProvider,
-                fit: BoxFit.contain
-              ),
+              image: DecorationImage(image: imageProvider, fit: BoxFit.contain),
             ),
           ),
-          placeholder: (context, url) => SizedBox(
-            width: 80,
-            height: 50,
-          ),
-          errorWidget: (context, url, error) => SizedBox(
-            width: 80,
-            height: 50,
-          ),
+          placeholder: (context, url) => SizedBox(width: 80, height: 50),
+          errorWidget: (context, url, error) => SizedBox(width: 80, height: 50),
         ),
         title: Text(
           widget.channel.name,
           style: Theme.of(context).primaryTextTheme.labelLarge!.copyWith(
-            color: Theme.of(context).colorScheme.onPrimaryContainer
+            color: Theme.of(context).colorScheme.onPrimaryContainer,
           ),
         ),
       ),

@@ -1,13 +1,13 @@
 import 'dart:async';
-import 'package:av_media_player/index.dart';
 import 'package:bloc/bloc.dart';
 import 'package:zaptv/app/home/domain/entities/channel.dart';
 import 'package:zaptv/app/home/domain/usecase/get_channels.dart';
+import 'package:zaptv/core/services/zap_video_controller.dart';
 part 'home_event.dart';
 part 'home_state.dart';
 
 class HomeBloc extends Bloc<HomeEvent, HomeState> {
-  final AvMediaPlayer videoController;
+  final ZapVideoController videoController;
   final GetChannels getChannels;
 
   HomeBloc({
