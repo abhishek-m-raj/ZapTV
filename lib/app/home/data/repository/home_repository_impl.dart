@@ -1,3 +1,4 @@
+import 'dart:developer' as dev;
 import 'package:dartz/dartz.dart';
 import 'package:zaptv/app/home/data/models/channel.dart';
 import 'package:zaptv/app/home/data/source/iptvorg_remote_datasource.dart';
@@ -17,36 +18,62 @@ class HomeRepositoryImpl implements HomeRepository {
 
   @override
   Future<Either<Failure, List<ChannelEntity>>> getChannels() async {
+    dev.log('Starting getChannels request...', name: 'HomeRepositoryImpl');
+
     List<Channel> jioChannels = [];
     List<Channel> iptvChannels = [];
 
     try {
       jioChannels = await jiotvGoRemoteDataSource.getAllChannels();
-    } catch (_) {
-      // JioTV-Go instance may be unreachable or offline
+      dev.log('JioTV data source returned ${jioChannels.length} channels', name: 'HomeRepositoryImpl');
+    } catch (e) {
+      dev.log('Error fetching JioTV channels: $e', name: 'HomeRepositoryImpl');
     }
 
     try {
       iptvChannels = await iptvRemoteDataSource.getAllPosts();
-    } catch (_) {
-      // IPTV-Org source error
+      dev.log('IPTV-Org data source returned ${iptvChannels.length} channels', name: 'HomeRepositoryImpl');
+    } catch (e) {
+      dev.log('Error fetching IPTV-Org channels: $e', name: 'HomeRepositoryImpl');
     }
 
+    // Filter out any invalid/blank entries
+    jioChannels = jioChannels.where(_isValid).toList();
+    iptvChannels = iptvChannels.where(_isValid).toList();
+
     if (jioChannels.isEmpty && iptvChannels.isEmpty) {
+      dev.log('Both JioTV and IPTV-Org returned zero valid channels!', name: 'HomeRepositoryImpl');
       return Left(Failure());
     }
 
-    return Right([
-      ...jioChannels.map((ch) => ch.toEntity()),
-      ...iptvChannels.map((ch) => ch.toEntity()),
-    ]);
+    // Append "-jiotv" to JioTV channel IDs without deduplication/merging
+    final List<ChannelEntity> jioEntities = jioChannels.map((ch) {
+      final entity = ch.toEntity();
+      return ChannelEntity(
+        id: '${entity.id}-jiotv',
+        name: entity.name,
+        image: entity.image,
+        group: entity.group,
+        streamUrl: entity.streamUrl,
+      );
+    }).toList();
+
+    final List<ChannelEntity> iptvEntities =
+        iptvChannels.map((ch) => ch.toEntity()).toList();
+
+    final List<ChannelEntity> result = [...jioEntities, ...iptvEntities];
+
+    dev.log(
+      'Channel collection complete (No deduplication). Total channels: ${result.length} (JioTV: ${jioEntities.length}, IPTV: ${iptvEntities.length})',
+      name: 'HomeRepositoryImpl',
+    );
+
+    return Right(result);
   }
 
-  // String _normalizeName(String name) {
-  //   return name
-  //       .toLowerCase()
-  //       .replaceAll(RegExp(r'\b(hd|sd|fhd|4k)\b', caseSensitive: false), '')
-  //       .replaceAll(RegExp(r'[^a-z0-9]'), '')
-  //       .trim();
-  // }
+  bool _isValid(Channel ch) {
+    final name = ch.name.trim();
+    final url = ch.streamUrl.trim();
+    return name.isNotEmpty && url.isNotEmpty && !name.startsWith('#');
+  }
 }
