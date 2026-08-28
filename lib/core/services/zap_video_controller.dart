@@ -22,7 +22,13 @@ class ZapVideoController extends ChangeNotifier {
   ZapVideoController() {
     if (isDesktop) {
       _mkPlayer = Player();
-      _mkVideoController = VideoController(_mkPlayer!);
+      _mkVideoController = VideoController(
+        _mkPlayer!,
+        configuration: VideoControllerConfiguration(
+          enableHardwareAcceleration: !Platform.isLinux,
+          hwdec: Platform.isLinux ? 'no' : 'auto',
+        ),
+      );
       _mkPlayer?.stream.error.listen((err) {
         talker.error('MediaKit Video Error: $err');
       });
