@@ -74,15 +74,15 @@ class _MyHomePageState extends State<HomePage> {
     final bool isKeyUp = event is KeyUpEvent;
     if (isKeyUp) return false;
     if (isMenuOpened) return false;
-    if (key == LogicalKeyboardKey.arrowUp) {
+    if (key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.arrowRight) {
+      bloc.add(HomeNextChannelEvent());
       showChannelInfo();
       return true;
-    } else if (key == LogicalKeyboardKey.arrowLeft) {
+    } else if (key == LogicalKeyboardKey.arrowDown || key == LogicalKeyboardKey.arrowLeft) {
       bloc.add(HomePreviousChannelEvent());
       showChannelInfo();
       return true;
-    } else if (key == LogicalKeyboardKey.arrowRight) {
-      bloc.add(HomeNextChannelEvent());
+    } else if (key == LogicalKeyboardKey.info || key == LogicalKeyboardKey.keyI) {
       showChannelInfo();
       return true;
     } else if (key == LogicalKeyboardKey.select ||
@@ -98,16 +98,17 @@ class _MyHomePageState extends State<HomePage> {
 
   bool openMenu() {
     if (bloc.state is! HomeLoadedState) return false;
-    isMenuOpened = true;
+    setState(() {
+      isMenuOpened = true;
+    });
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => MenuPage(
-          videoController: bloc.videoController,
           currentChannel: bloc.currentState.currentChannel,
-          channels: bloc.currentState.channels,
-          onChannelSelected: (ChannelEntity channel) {
-            bloc.add(HomeSelectChannelEvent(channel));
+          channels: bloc.currentState.allChannels,
+          onChannelSelected: (ChannelEntity channel, List<ChannelEntity> activePlaylist) {
+            bloc.add(HomeSelectChannelEvent(channel, activePlaylist: activePlaylist));
           },
           onJioLoginSuccess: () {
             bloc.add(HomeInitialEvent());

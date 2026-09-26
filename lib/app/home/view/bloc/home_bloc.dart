@@ -40,6 +40,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
           HomeLoadedState(
             currentChannel: initialChannel,
             channels: r,
+            allChannels: r,
           ),
         );
         if (!initialChannel.streamUrl.startsWith("http")) return;
@@ -111,6 +112,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     emit(
       currentState.copyWith(
         currentChannel: targetChannel,
+        channels: event.activePlaylist ?? currentState.channels,
       ),
     );
     if (!targetChannel.streamUrl.startsWith("http")) return;

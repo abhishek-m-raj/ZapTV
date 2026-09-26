@@ -17,5 +17,6 @@ class HomeShowChannelInfoEvent extends HomeEvent {
 
 class HomeSelectChannelEvent extends HomeEvent {
   final ChannelEntity channel;
-  HomeSelectChannelEvent(this.channel);
+  final List<ChannelEntity>? activePlaylist;
+  HomeSelectChannelEvent(this.channel, {this.activePlaylist});
 }
