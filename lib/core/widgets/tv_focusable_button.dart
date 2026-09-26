@@ -6,6 +6,8 @@ class TvFocusableButton extends StatefulWidget {
   final Widget label;
   final bool isJioLoggedIn;
   final bool isFocused;
+  final bool autofocus;
+  final FocusNode? focusNode;
 
   const TvFocusableButton({
     super.key,
@@ -14,6 +16,8 @@ class TvFocusableButton extends StatefulWidget {
     required this.label,
     this.isJioLoggedIn = false,
     this.isFocused = false,
+    this.autofocus = false,
+    this.focusNode,
   });
 
   @override
@@ -27,8 +31,10 @@ class _TvFocusableButtonState extends State<TvFocusableButton> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final hasFocus = _isFocused || widget.isFocused;
-    
+
     return InkWell(
+      focusNode: widget.focusNode,
+      autofocus: widget.autofocus,
       onTap: widget.onPressed,
       onFocusChange: (focusValue) {
         setState(() {
@@ -43,8 +49,10 @@ class _TvFocusableButtonState extends State<TvFocusableButton> {
           color: hasFocus
               ? theme.colorScheme.primary
               : (widget.isJioLoggedIn
-                  ? Colors.green.shade800
-                  : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.15)),
+                    ? Colors.green.shade800
+                    : theme.colorScheme.surfaceContainerHighest.withValues(
+                        alpha: 0.15,
+                      )),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: hasFocus ? Colors.white : Colors.transparent,
@@ -56,7 +64,7 @@ class _TvFocusableButtonState extends State<TvFocusableButton> {
                     color: theme.colorScheme.primary.withValues(alpha: 0.4),
                     blurRadius: 8,
                     spreadRadius: 2,
-                  )
+                  ),
                 ]
               : [],
         ),
@@ -66,9 +74,11 @@ class _TvFocusableButtonState extends State<TvFocusableButton> {
             if (widget.icon != null) ...[
               IconTheme(
                 data: IconThemeData(
-                  color: hasFocus 
-                      ? Colors.white 
-                      : (widget.isJioLoggedIn ? Colors.white : theme.colorScheme.onSurface),
+                  color: hasFocus
+                      ? Colors.white
+                      : (widget.isJioLoggedIn
+                            ? Colors.white
+                            : theme.colorScheme.onSurface),
                 ),
                 child: widget.icon!,
               ),
@@ -76,9 +86,11 @@ class _TvFocusableButtonState extends State<TvFocusableButton> {
             ],
             DefaultTextStyle(
               style: TextStyle(
-                color: hasFocus 
-                    ? Colors.white 
-                    : (widget.isJioLoggedIn ? Colors.white : theme.colorScheme.onSurface),
+                color: hasFocus
+                    ? Colors.white
+                    : (widget.isJioLoggedIn
+                          ? Colors.white
+                          : theme.colorScheme.onSurface),
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
               ),
