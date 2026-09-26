@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:zaptv/app/home/view/pages/home.dart';
@@ -30,6 +29,8 @@ final shortcuts = {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 256 * 1024 * 1024;
+  PaintingBinding.instance.imageCache.maximumSize = 1000;
   MediaKit.ensureInitialized();
   configTouchDevices();
   await setupLocator();
@@ -48,12 +49,12 @@ void configTouchDevices() {
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
       systemNavigationBarColor: Colors.transparent,
-      systemNavigationBarDividerColor: Colors.transparent,
       systemNavigationBarIconBrightness: Brightness.light,
     ),
   );
-  SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 }
 
 class ZapTV extends StatelessWidget {
@@ -61,17 +62,21 @@ class ZapTV extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'ZapTV',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          brightness: Brightness.dark,
-          seedColor: Colors.blue,
-        ),
-      ),
+    return Shortcuts(
       shortcuts: shortcuts,
-      debugShowCheckedModeBanner: false,
-      home: const HomePage(),
-    ).animate().fadeIn();
+      child: MaterialApp(
+        title: 'ZapTV',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          brightness: Brightness.dark,
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: Colors.deepPurple,
+            brightness: Brightness.dark,
+          ),
+          useMaterial3: true,
+        ),
+        home: const HomePage(),
+      ),
+    );
   }
 }

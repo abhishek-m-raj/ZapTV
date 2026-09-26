@@ -34,18 +34,54 @@ class MenuPage extends StatefulWidget {
 class _MenuPageState extends State<MenuPage> {
   late ChannelEntity currentChannel;
   bool _isJioLoggedIn = false;
-  int _selectedCategoryIndex = 0; // 0: All, 1: Favorites
+  int _selectedCategoryIndex = 0; // 0: All, 1: Favorites, 2: JioTV, 3: IPTV
   final HiveDb _hiveDb = loc<HiveDb>();
 
-  // To keep track of the currently focused channel in the grid
-  ChannelEntity? _focusedChannel;
+  // Cached lists to avoid filtering hundreds/thousands of channels on every frame
+  late final List<ChannelEntity> _allChannels;
+  late final List<ChannelEntity> _jioChannels;
+  late final List<ChannelEntity> _iptvChannels;
+  List<ChannelEntity> _displayedChannels = const [];
+
+  // ValueNotifier for focused channel to update ONLY preview header without rebuilding entire grid
+  late final ValueNotifier<ChannelEntity?> _focusedChannelNotifier;
 
   @override
   void initState() {
-    currentChannel = widget.currentChannel;
-    _focusedChannel = currentChannel;
-    _checkJioLoginStatus();
     super.initState();
+    currentChannel = widget.currentChannel;
+    _focusedChannelNotifier = ValueNotifier<ChannelEntity?>(currentChannel);
+
+    _allChannels = widget.channels;
+    _jioChannels = widget.channels
+        .where((c) => c.id.endsWith('-jiotv'))
+        .toList();
+    _iptvChannels = widget.channels
+        .where((c) => !c.id.endsWith('-jiotv'))
+        .toList();
+    _updateDisplayedChannels();
+
+    _checkJioLoginStatus();
+  }
+
+  @override
+  void dispose() {
+    _focusedChannelNotifier.dispose();
+    super.dispose();
+  }
+
+  void _updateDisplayedChannels() {
+    if (_selectedCategoryIndex == 1) {
+      _displayedChannels = widget.channels
+          .where((c) => _isFavorite(c))
+          .toList();
+    } else if (_selectedCategoryIndex == 2) {
+      _displayedChannels = _jioChannels;
+    } else if (_selectedCategoryIndex == 3) {
+      _displayedChannels = _iptvChannels;
+    } else {
+      _displayedChannels = _allChannels;
+    }
   }
 
   Future<void> _checkJioLoginStatus() async {
@@ -72,9 +108,17 @@ class _MenuPageState extends State<MenuPage> {
       _hiveDb.putData(channel.id, true, 'fav');
     }
     setState(() {
-      if (_selectedCategoryIndex == 1 && isFav && _focusedChannel == channel) {
-        final remaining = widget.channels.where((c) => _isFavorite(c)).toList();
-        _focusedChannel = remaining.isNotEmpty ? remaining.first : null;
+      _updateDisplayedChannels();
+      if (_selectedCategoryIndex == 1 &&
+          isFav &&
+          _focusedChannelNotifier.value == channel) {
+        _focusedChannelNotifier.value = _displayedChannels.isNotEmpty
+            ? _displayedChannels.first
+            : null;
+      } else if (_focusedChannelNotifier.value == channel) {
+        // Trigger ValueNotifier update to refresh favorite star in header
+        _focusedChannelNotifier.value = null;
+        _focusedChannelNotifier.value = channel;
       }
     });
   }
@@ -97,15 +141,15 @@ class _MenuPageState extends State<MenuPage> {
     );
   }
 
-  List<ChannelEntity> get _displayedChannels {
-    if (_selectedCategoryIndex == 1) {
-      return widget.channels.where((c) => _isFavorite(c)).toList();
-    } else if (_selectedCategoryIndex == 2) {
-      return widget.channels.where((c) => c.id.endsWith('-jiotv')).toList();
-    } else if (_selectedCategoryIndex == 3) {
-      return widget.channels.where((c) => !c.id.endsWith('-jiotv')).toList();
-    }
-    return widget.channels;
+  void _onCategorySelect(int index) {
+    if (_selectedCategoryIndex == index) return;
+    setState(() {
+      _selectedCategoryIndex = index;
+      _updateDisplayedChannels();
+      if (_displayedChannels.isNotEmpty) {
+        _focusedChannelNotifier.value = _displayedChannels.first;
+      }
+    });
   }
 
   @override
@@ -142,25 +186,25 @@ class _MenuPageState extends State<MenuPage> {
                     icon: Icons.tv,
                     label: "All Channels",
                     isSelected: _selectedCategoryIndex == 0,
-                    onFocus: () => setState(() => _selectedCategoryIndex = 0),
+                    onFocus: () => _onCategorySelect(0),
                   ),
                   _SideMenuItem(
                     icon: Icons.star,
                     label: "Favorites",
                     isSelected: _selectedCategoryIndex == 1,
-                    onFocus: () => setState(() => _selectedCategoryIndex = 1),
+                    onFocus: () => _onCategorySelect(1),
                   ),
                   _SideMenuItem(
                     icon: Icons.cell_tower,
                     label: "JioTV",
                     isSelected: _selectedCategoryIndex == 2,
-                    onFocus: () => setState(() => _selectedCategoryIndex = 2),
+                    onFocus: () => _onCategorySelect(2),
                   ),
                   _SideMenuItem(
                     icon: Icons.public,
                     label: "IPTV",
                     isSelected: _selectedCategoryIndex == 3,
-                    onFocus: () => setState(() => _selectedCategoryIndex = 3),
+                    onFocus: () => _onCategorySelect(3),
                   ),
                   const Spacer(),
                   Padding(
@@ -194,112 +238,126 @@ class _MenuPageState extends State<MenuPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // TOP HEADER / PREVIEW
-                  Container(
-                    height: 220,
-                    padding: const EdgeInsets.all(24.0),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          theme.colorScheme.surface.withValues(alpha: 0.6),
-                          Colors.transparent,
-                        ],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                _focusedChannel?.name ?? currentChannel.name,
-                                style: theme.textTheme.displaySmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
+                  // TOP HEADER / PREVIEW (Listening to ValueNotifier: only this rebuilds on focus!)
+                  ValueListenableBuilder<ChannelEntity?>(
+                    valueListenable: _focusedChannelNotifier,
+                    builder: (context, focusedChannel, _) {
+                      final activeChannel = focusedChannel ?? currentChannel;
+
+                      return Container(
+                        height: 220,
+                        padding: const EdgeInsets.all(24.0),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              theme.colorScheme.surface.withValues(alpha: 0.6),
+                              Colors.transparent,
+                            ],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: theme.colorScheme.primary,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: const Text(
-                                      "LIVE",
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
                                   Text(
-                                    _focusedChannel?.group ??
-                                        currentChannel.group,
-                                    style: theme.textTheme.titleMedium
-                                        ?.copyWith(color: Colors.white70),
+                                    activeChannel.name,
+                                    style: theme.textTheme.displaySmall
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  if (_isFavorite(
-                                    _focusedChannel ?? currentChannel,
-                                  )) ...[
-                                    const SizedBox(width: 8),
-                                    const Icon(
-                                      Icons.star,
-                                      color: Colors.amber,
-                                      size: 20,
-                                    ),
-                                  ],
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: theme.colorScheme.primary,
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          "LIVE",
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        activeChannel.group,
+                                        style: theme.textTheme.titleMedium
+                                            ?.copyWith(color: Colors.white70),
+                                      ),
+                                      if (_isFavorite(activeChannel)) ...[
+                                        const SizedBox(width: 8),
+                                        const Icon(
+                                          Icons.star,
+                                          color: Colors.amber,
+                                          size: 20,
+                                        ),
+                                      ],
+                                    ],
+                                  ),
                                 ],
                               ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 24),
-                        Container(
-                          width: 300,
-                          clipBehavior: Clip.antiAlias,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.white24, width: 2),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Colors.black54,
-                                blurRadius: 10,
-                                spreadRadius: 2,
+                            ),
+                            const SizedBox(width: 24),
+                            Container(
+                              width: 300,
+                              clipBehavior: Clip.antiAlias,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Colors.white24,
+                                  width: 2,
+                                ),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Colors.black54,
+                                    blurRadius: 10,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                          child: CachedNetworkImage(
-                            imageUrl:
-                                _focusedChannel?.image ?? currentChannel.image,
-                            fit: BoxFit.contain,
-                            placeholder: (context, url) => const Icon(
-                              Icons.tv,
-                              size: 80,
-                              color: Colors.white24,
+                              child: CachedNetworkImage(
+                                imageUrl: activeChannel.image,
+                                fit: BoxFit.contain,
+                                memCacheWidth: 400,
+                                fadeInDuration: const Duration(
+                                  milliseconds: 150,
+                                ),
+                                placeholder: (context, url) => const Icon(
+                                  Icons.tv,
+                                  size: 80,
+                                  color: Colors.white24,
+                                ),
+                                errorWidget: (context, url, error) =>
+                                    const Icon(
+                                      Icons.tv,
+                                      size: 80,
+                                      color: Colors.white24,
+                                    ),
+                              ),
                             ),
-                            errorWidget: (context, url, error) => const Icon(
-                              Icons.tv,
-                              size: 80,
-                              color: Colors.white24,
-                            ),
-                          ),
+                          ],
                         ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
                   // GRID OF CHANNELS
                   Expanded(
@@ -315,6 +373,8 @@ class _MenuPageState extends State<MenuPage> {
                               ),
                             )
                           : GridView.builder(
+                              // ignore: deprecated_member_use
+                              cacheExtent: 800.0,
                               gridDelegate:
                                   const SliverGridDelegateWithFixedCrossAxisCount(
                                     crossAxisCount: 4,
@@ -326,6 +386,7 @@ class _MenuPageState extends State<MenuPage> {
                               itemBuilder: (context, index) {
                                 final channel = displayed[index];
                                 return ChannelGridTile(
+                                  key: ValueKey(channel.id),
                                   channel: channel,
                                   isFavorite: _isFavorite(channel),
                                   isPlaying: channel == currentChannel,
@@ -333,9 +394,7 @@ class _MenuPageState extends State<MenuPage> {
                                       channel == currentChannel &&
                                       _selectedCategoryIndex == 0,
                                   onFocus: () {
-                                    setState(() {
-                                      _focusedChannel = channel;
-                                    });
+                                    _focusedChannelNotifier.value = channel;
                                   },
                                   onTap: () {
                                     widget.onChannelSelected(
@@ -483,8 +542,8 @@ class _ChannelGridTileState extends State<ChannelGridTile> {
         Scrollable.ensureVisible(
           context,
           alignment: 0.5,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOutCubic,
         );
       }
     });
@@ -516,182 +575,189 @@ class _ChannelGridTileState extends State<ChannelGridTile> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Focus(
-      focusNode: _focusNode,
-      autofocus: widget.autofocus,
-      onKeyEvent: (node, event) {
-        if (event is KeyDownEvent) {
-          if (event.logicalKey == LogicalKeyboardKey.keyF ||
-              event.logicalKey == LogicalKeyboardKey.asterisk) {
-            widget.onToggleFavorite();
-            return KeyEventResult.handled;
-          } else if (event.logicalKey == LogicalKeyboardKey.contextMenu ||
-              event.logicalKey == LogicalKeyboardKey.keyM) {
+    return RepaintBoundary(
+      child: Focus(
+        focusNode: _focusNode,
+        autofocus: widget.autofocus,
+        onKeyEvent: (node, event) {
+          if (event is KeyDownEvent) {
+            if (event.logicalKey == LogicalKeyboardKey.keyF ||
+                event.logicalKey == LogicalKeyboardKey.asterisk) {
+              widget.onToggleFavorite();
+              return KeyEventResult.handled;
+            } else if (event.logicalKey == LogicalKeyboardKey.contextMenu ||
+                event.logicalKey == LogicalKeyboardKey.keyM) {
+              HapticFeedback.mediumImpact();
+              widget.onLongPress();
+              return KeyEventResult.handled;
+            } else if (_isSelectKey(event.logicalKey)) {
+              if (!_isSelectPressed) {
+                _isSelectPressed = true;
+                _isLongPressTriggered = false;
+                _longPressTimer?.cancel();
+                _longPressTimer = Timer(const Duration(milliseconds: 500), () {
+                  if (mounted && _focusNode.hasFocus) {
+                    _isLongPressTriggered = true;
+                    HapticFeedback.mediumImpact();
+                    widget.onLongPress();
+                  }
+                });
+              }
+              return KeyEventResult.handled;
+            }
+          } else if (event is KeyRepeatEvent) {
+            if (_isSelectKey(event.logicalKey)) {
+              return KeyEventResult.handled;
+            }
+          } else if (event is KeyUpEvent) {
+            if (_isSelectKey(event.logicalKey)) {
+              final timerWasActive = _longPressTimer?.isActive ?? false;
+              _cancelLongPress();
+              if (!_isLongPressTriggered && timerWasActive) {
+                _focusNode.requestFocus();
+                widget.onTap();
+              }
+              return KeyEventResult.handled;
+            }
+          }
+          return KeyEventResult.ignored;
+        },
+        child: GestureDetector(
+          onTap: () {
+            _focusNode.requestFocus();
+            widget.onTap();
+          },
+          onLongPress: () {
+            _focusNode.requestFocus();
             HapticFeedback.mediumImpact();
             widget.onLongPress();
-            return KeyEventResult.handled;
-          } else if (_isSelectKey(event.logicalKey)) {
-            if (!_isSelectPressed) {
-              _isSelectPressed = true;
-              _isLongPressTriggered = false;
-              _longPressTimer?.cancel();
-              _longPressTimer = Timer(const Duration(milliseconds: 500), () {
-                if (mounted && _focusNode.hasFocus) {
-                  _isLongPressTriggered = true;
-                  HapticFeedback.mediumImpact();
-                  widget.onLongPress();
-                }
-              });
-            }
-            return KeyEventResult.handled;
-          }
-        } else if (event is KeyRepeatEvent) {
-          if (_isSelectKey(event.logicalKey)) {
-            return KeyEventResult.handled;
-          }
-        } else if (event is KeyUpEvent) {
-          if (_isSelectKey(event.logicalKey)) {
-            final timerWasActive = _longPressTimer?.isActive ?? false;
-            _cancelLongPress();
-            if (!_isLongPressTriggered && timerWasActive) {
-              _focusNode.requestFocus();
-              widget.onTap();
-            }
-            return KeyEventResult.handled;
-          }
-        }
-        return KeyEventResult.ignored;
-      },
-      child: GestureDetector(
-        onTap: () {
-          _focusNode.requestFocus();
-          widget.onTap();
-        },
-        onLongPress: () {
-          _focusNode.requestFocus();
-          HapticFeedback.mediumImpact();
-          widget.onLongPress();
-        },
-        onSecondaryTap: () {
-          _focusNode.requestFocus();
-          widget.onLongPress();
-        },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOutCubic,
-          transform: Matrix4.diagonal3Values(
-            _isFocused ? 1.05 : 1.0,
-            _isFocused ? 1.05 : 1.0,
-            1.0,
-          ),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: _isFocused
-                  ? Colors.white
-                  : (widget.isPlaying
-                        ? theme.colorScheme.primary
-                        : Colors.transparent),
-              width: _isFocused ? 3 : (widget.isPlaying ? 2 : 0),
+          },
+          onSecondaryTap: () {
+            _focusNode.requestFocus();
+            widget.onLongPress();
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOutCubic,
+            transform: Matrix4.diagonal3Values(
+              _isFocused ? 1.05 : 1.0,
+              _isFocused ? 1.05 : 1.0,
+              1.0,
             ),
-            boxShadow: _isFocused
-                ? [
-                    BoxShadow(
-                      color: theme.colorScheme.primary.withValues(alpha: 0.6),
-                      blurRadius: 15,
-                      spreadRadius: 2,
-                    ),
-                  ]
-                : [],
-          ),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // Logo Background
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: CachedNetworkImage(
-                  imageUrl: widget.channel.image,
-                  fit: BoxFit.contain,
-                  placeholder: (context, url) =>
-                      const Icon(Icons.tv, size: 40, color: Colors.white24),
-                  errorWidget: (context, url, error) =>
-                      const Icon(Icons.tv, size: 40, color: Colors.white24),
-                ),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _isFocused
+                    ? Colors.white
+                    : (widget.isPlaying
+                          ? theme.colorScheme.primary
+                          : Colors.transparent),
+                width: _isFocused ? 3 : (widget.isPlaying ? 2 : 0),
               ),
-              // Gradient Overlay for text
-              Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(10),
-                  gradient: const LinearGradient(
-                    colors: [Colors.black87, Colors.transparent],
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    stops: [0.0, 0.4],
+              boxShadow: _isFocused
+                  ? [
+                      BoxShadow(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.6),
+                        blurRadius: 15,
+                        spreadRadius: 2,
+                      ),
+                    ]
+                  : [],
+            ),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Logo Background
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: CachedNetworkImage(
+                    imageUrl: widget.channel.image,
+                    fit: BoxFit.contain,
+                    memCacheWidth: 200,
+                    fadeInDuration: const Duration(milliseconds: 150),
+                    fadeOutDuration: const Duration(milliseconds: 100),
+                    placeholder: (context, url) =>
+                        const Icon(Icons.tv, size: 40, color: Colors.white24),
+                    errorWidget: (context, url, error) =>
+                        const Icon(Icons.tv, size: 40, color: Colors.white24),
                   ),
                 ),
-              ),
-              // Title & Favorite Icon
-              Positioned(
-                bottom: 8,
-                left: 12,
-                right: 12,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        widget.channel.name,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          shadows: [Shadow(color: Colors.black, blurRadius: 2)],
+                // Gradient Overlay for text
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    gradient: const LinearGradient(
+                      colors: [Colors.black87, Colors.transparent],
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      stops: [0.0, 0.4],
+                    ),
+                  ),
+                ),
+                // Title & Favorite Icon
+                Positioned(
+                  bottom: 8,
+                  left: 12,
+                  right: 12,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.channel.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            shadows: [
+                              Shadow(color: Colors.black, blurRadius: 2),
+                            ],
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      ),
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 200),
+                        transitionBuilder: (child, animation) =>
+                            ScaleTransition(scale: animation, child: child),
+                        child: widget.isFavorite
+                            ? const Padding(
+                                key: ValueKey('fav_star'),
+                                padding: EdgeInsets.only(left: 4.0),
+                                child: Icon(
+                                  Icons.star,
+                                  color: Colors.amber,
+                                  size: 16,
+                                ),
+                              )
+                            : const SizedBox.shrink(key: ValueKey('no_fav')),
+                      ),
+                    ],
+                  ),
+                ),
+                // Playing Indicator
+                if (widget.isPlaying)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Icon(
+                        Icons.play_arrow,
+                        size: 14,
+                        color: Colors.white,
                       ),
                     ),
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 200),
-                      transitionBuilder: (child, animation) =>
-                          ScaleTransition(scale: animation, child: child),
-                      child: widget.isFavorite
-                          ? const Padding(
-                              key: ValueKey('fav_star'),
-                              padding: EdgeInsets.only(left: 4.0),
-                              child: Icon(
-                                Icons.star,
-                                color: Colors.amber,
-                                size: 16,
-                              ),
-                            )
-                          : const SizedBox.shrink(key: ValueKey('no_fav')),
-                    ),
-                  ],
-                ),
-              ),
-              // Playing Indicator
-              if (widget.isPlaying)
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primary,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Icon(
-                      Icons.play_arrow,
-                      size: 14,
-                      color: Colors.white,
-                    ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

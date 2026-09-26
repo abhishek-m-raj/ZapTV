@@ -111,6 +111,8 @@ class _ChannelOptionsDialogState extends State<ChannelOptionsDialog> {
                   child: CachedNetworkImage(
                     imageUrl: widget.channel.image,
                     fit: BoxFit.contain,
+                    memCacheWidth: 150,
+                    fadeInDuration: const Duration(milliseconds: 150),
                     placeholder: (context, url) =>
                         const Icon(Icons.tv, size: 32, color: Colors.white24),
                     errorWidget: (context, url, error) =>
