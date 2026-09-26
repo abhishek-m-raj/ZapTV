@@ -6,15 +6,19 @@ class ChannelEntity with EquatableMixin {
   final String image;
   final String group;
   final String streamUrl;
+  final String? licenseType;
+  final String? licenseKey;
 
   const ChannelEntity({
     required this.id,
     required this.name,
     required this.image,
     required this.group,
-    required this.streamUrl
+    required this.streamUrl,
+    this.licenseType,
+    this.licenseKey,
   });
   
   @override
-  List<Object?> get props => [id, name, image, group, streamUrl];
+  List<Object?> get props => [id, name, image, group, streamUrl, licenseType, licenseKey];
 }

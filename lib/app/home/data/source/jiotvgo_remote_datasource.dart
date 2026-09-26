@@ -5,8 +5,8 @@ import 'package:zaptv/app/home/data/models/channel.dart';
 import 'package:zaptv/core/services/talker_service.dart';
 
 class JiotvGoRemoteDataSource {
-  static const String playlistUrl = "http://localhost:5001/playlist.m3u";
-  static const String jsonChannelsUrl = "http://localhost:5001/channels";
+  static const String playlistUrl = "http://localhost:5050/playlist.m3u";
+  static const String jsonChannelsUrl = "http://localhost:5050/channels";
 
   JiotvGoRemoteDataSource();
 
@@ -76,6 +76,8 @@ class JiotvGoRemoteDataSource {
       final title = i.title.trim();
       final link = i.link.trim();
       final tvgId = i.attributes["tvg-id"]?.trim() ?? "";
+      final licenseType = i.attributes["inputstream-adaptive-license_type"]?.trim() ?? i.attributes["license-type"]?.trim();
+      final licenseKey = i.attributes["inputstream-adaptive-license_key"]?.trim() ?? i.attributes["license-key"]?.trim();
 
       // Strict validation: skip blank channel names, header comments, or missing links
       if (title.isEmpty || link.isEmpty || title.startsWith('#')) continue;
@@ -87,6 +89,8 @@ class JiotvGoRemoteDataSource {
           image: i.attributes["tvg-logo"] ?? "",
           group: i.attributes["group-title"] ?? "JioTV",
           streamUrl: link,
+          licenseType: licenseType,
+          licenseKey: licenseKey,
         ),
       );
     }
@@ -106,7 +110,14 @@ class JiotvGoRemoteDataSource {
       throw Exception('HTTP status ${res.statusCode}');
     }
 
-    final List<dynamic> jsonList = jsonDecode(res.body);
+    final decoded = jsonDecode(res.body);
+    
+    if (decoded is Map) {
+      // The server returned an object instead of a list. This usually means an error (e.g. not logged in).
+      throw Exception('Server returned error object: $decoded');
+    }
+    
+    final List<dynamic> jsonList = decoded as List<dynamic>;
     final List<Channel> data = [];
 
     for (final item in jsonList) {
@@ -115,7 +126,9 @@ class JiotvGoRemoteDataSource {
       final name = item['name']?.toString().trim() ?? item['channel_name']?.toString().trim() ?? '';
       final logo = item['logo']?.toString() ?? item['logo_url']?.toString() ?? item['icon']?.toString() ?? '';
       final group = item['category']?.toString() ?? item['group']?.toString() ?? 'JioTV';
-      final streamUrl = 'http://localhost:5001/live/$id.m3u8';
+      final streamUrl = 'http://localhost:5050/live/$id.m3u8';
+      final licenseType = item['license_type']?.toString() ?? item['drm_type']?.toString();
+      final licenseKey = item['license_key']?.toString() ?? item['drm_key']?.toString();
 
       if (name.isNotEmpty && id.isNotEmpty) {
         data.add(
@@ -125,6 +138,8 @@ class JiotvGoRemoteDataSource {
             image: logo,
             group: group,
             streamUrl: streamUrl,
+            licenseType: licenseType,
+            licenseKey: licenseKey,
           ),
         );
       }
@@ -135,28 +150,70 @@ class JiotvGoRemoteDataSource {
   String _sanitizeM3U(String rawM3u) {
     final lines = rawM3u.split('\n');
     final buffer = StringBuffer();
+    buffer.writeln('#EXTM3U');
 
-    bool skipBlock = false;
+    String? currentExtInf;
+    final Map<String, String> currentProps = {};
+
     for (int i = 0; i < lines.length; i++) {
       final line = lines[i].trim();
+      if (line.isEmpty || line.startsWith('#EXTM3U')) continue;
 
       if (line.startsWith('#EXTINF')) {
-        skipBlock = false;
-      }
-
-      if (line.startsWith('#EXTVLCOPT')) {
-        skipBlock = true;
-      }
-
-      if (line.startsWith('http') && skipBlock) {
+        if (currentExtInf != null) {
+          buffer.writeln(_buildExtInfLine(currentExtInf, currentProps));
+          currentProps.clear();
+        }
+        currentExtInf = line;
+      } else if (line.startsWith('#KODIPROP:')) {
+        final propContent = line.substring('#KODIPROP:'.length);
+        final eqIdx = propContent.indexOf('=');
+        if (eqIdx != -1) {
+          final key = propContent.substring(0, eqIdx).trim();
+          final val = propContent.substring(eqIdx + 1).trim();
+          currentProps[key] = val;
+        }
+      } else if (line.startsWith('#')) {
         continue;
-      }
-
-      if (!skipBlock && line.isNotEmpty) {
+      } else {
+        if (currentExtInf != null) {
+          buffer.writeln(_buildExtInfLine(currentExtInf, currentProps));
+          currentExtInf = null;
+          currentProps.clear();
+        }
         buffer.writeln(line);
       }
     }
 
+    if (currentExtInf != null) {
+      buffer.writeln(_buildExtInfLine(currentExtInf, currentProps));
+    }
+
     return buffer.toString();
+  }
+
+  String _buildExtInfLine(String extInf, Map<String, String> props) {
+    if (props.isEmpty) return extInf;
+
+    final commaIdx = extInf.lastIndexOf(',');
+    if (commaIdx == -1) {
+      final sb = StringBuffer(extInf);
+      props.forEach((key, value) {
+        final cleanKey = key.replaceAll('.', '-');
+        sb.write(' $cleanKey="$value"');
+      });
+      return sb.toString();
+    }
+
+    final attributesPart = extInf.substring(0, commaIdx);
+    final namePart = extInf.substring(commaIdx);
+
+    final sb = StringBuffer(attributesPart);
+    props.forEach((key, value) {
+      final cleanKey = key.replaceAll('.', '-');
+      sb.write(' $cleanKey="$value"');
+    });
+    sb.write(namePart);
+    return sb.toString();
   }
 }

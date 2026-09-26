@@ -9,6 +9,8 @@ import 'package:zaptv/app/menu/view/pages/menu.dart';
 import 'package:zaptv/core/config/locator.dart';
 import 'package:zaptv/core/services/zap_video_controller.dart';
 import 'package:zaptv/core/widgets/zap_video_view.dart';
+import 'package:zaptv/core/services/hive_db.dart';
+import 'package:zaptv/app/menu/view/widgets/jiotv_login_dialog.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -30,6 +32,30 @@ class _MyHomePageState extends State<HomePage> {
     ServicesBinding.instance.keyboard.addHandler(onKeyEvent);
     isMenuOpened = false;
     super.initState();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkFirstTimeLogin();
+    });
+  }
+
+  Future<void> _checkFirstTimeLogin() async {
+    try {
+      final hiveDb = loc<HiveDb>();
+      final hasSeenLogin = hiveDb.getData('has_seen_jio_login') ?? false;
+      if (!hasSeenLogin) {
+        final loggedIn = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const JiotvLoginDialog(),
+        );
+
+        await hiveDb.putData('has_seen_jio_login', true);
+
+        if (loggedIn == true) {
+          bloc.add(HomeInitialEvent());
+        }
+      }
+    } catch (_) {}
   }
 
   void showChannelInfo() {
@@ -41,6 +67,9 @@ class _MyHomePageState extends State<HomePage> {
   }
 
   bool onKeyEvent(KeyEvent event) {
+    // Ignore key events if the HomePage is not the top-most active route (e.g. dialog or menu is open)
+    if (ModalRoute.of(context)?.isCurrent != true) return false;
+
     final LogicalKeyboardKey key = event.logicalKey;
     final bool isKeyUp = event is KeyUpEvent;
     if (isKeyUp) return false;
@@ -80,6 +109,9 @@ class _MyHomePageState extends State<HomePage> {
           onChannelSelected: (ChannelEntity channel) {
             bloc.add(HomeSelectChannelEvent(channel));
           },
+          onJioLoginSuccess: () {
+            bloc.add(HomeInitialEvent());
+          },
           onPop: () async {
             await Future.delayed(const Duration(milliseconds: 500));
             setState(() {
@@ -114,7 +146,7 @@ class _MyHomePageState extends State<HomePage> {
               children: [
                 ZapVideoView(
                   controller: bloc.videoController,
-                  fit: BoxFit.cover,
+                  fit: BoxFit.contain,
                 ),
                 if (state is HomeLoadedState && state.showChannelInfo)
                   ChannelInfo(currentChannel: state.currentChannel),

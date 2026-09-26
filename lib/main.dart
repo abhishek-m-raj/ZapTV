@@ -5,11 +5,14 @@ import 'package:media_kit/media_kit.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:zaptv/app/home/view/pages/home.dart';
 import 'package:zaptv/core/config/locator.dart';
+import 'package:get_it/get_it.dart';
 
 final shortcuts = {
   // 🖥️ TV-specific shortcuts
   ...{
-    LogicalKeySet(LogicalKeyboardKey.enter): const ActivateIntent(),
+    LogicalKeySet(LogicalKeyboardKey.select): const ActivateIntent(),
+    // LogicalKeySet(LogicalKeyboardKey.select): const ActivateIntent(),
+    // LogicalKeySet(LogicalKeyboardKey.space): const ActivateIntent(),
     LogicalKeySet(LogicalKeyboardKey.arrowLeft): const DirectionalFocusIntent(
       TraversalDirection.left,
     ),
@@ -29,7 +32,8 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
   configTouchDevices();
-  setupLocator();
+  await setupLocator();
+  await GetIt.instance.allReady();
   try {
     await WakelockPlus.enable();
   } catch (_) {}

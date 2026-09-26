@@ -1,6 +1,7 @@
 import 'dart:ffi';
 import 'dart:io';
 import 'package:ffi/ffi.dart';
+import 'package:zaptv/core/services/talker_service.dart';
 
 /// Dart FFI bindings for the JioTV-Go shared library (libjiotv_go.so/.dylib/.dll).
 ///
@@ -29,6 +30,8 @@ typedef _SendOTPNative = Int32 Function(Pointer<Utf8> number);
 typedef _SendOTPDart = int Function(Pointer<Utf8> number);
 typedef _VerifyOTPNative = Int32 Function(Pointer<Utf8> number, Pointer<Utf8> otp);
 typedef _VerifyOTPDart = int Function(Pointer<Utf8> number, Pointer<Utf8> otp);
+typedef _SetDataDirNative = Void Function(Pointer<Utf8> dataDir);
+typedef _SetDataDirDart = void Function(Pointer<Utf8> dataDir);
 
 class JiotvGoFfi {
   late final DynamicLibrary _lib;
@@ -39,6 +42,7 @@ class JiotvGoFfi {
   late final _FreeStringDart _freeString;
   _SendOTPDart? _sendOtp;
   _VerifyOTPDart? _verifyOtp;
+  _SetDataDirDart? _setDataDir;
 
   bool _loaded = false;
 
@@ -52,7 +56,11 @@ class JiotvGoFfi {
 
     try {
       final libPath = customPath ?? _resolveLibraryPath();
-      if (libPath == null) return false;
+      if (libPath == null) {
+        talker.warning('[JioTV FFI] Could not resolve library path');
+        return false;
+      }
+      talker.info('[JioTV FFI] Loading library from path: $libPath');
 
       _lib = DynamicLibrary.open(libPath);
 
@@ -72,19 +80,26 @@ class JiotvGoFfi {
             .lookupFunction<_SendOTPNative, _SendOTPDart>('JioTVGoSendOTP');
         _verifyOtp = _lib
             .lookupFunction<_VerifyOTPNative, _VerifyOTPDart>('JioTVGoVerifyOTP');
-      } catch (_) {}
+        _setDataDir = _lib
+            .lookupFunction<_SetDataDirNative, _SetDataDirDart>('JioTVGoSetDataDir');
+        talker.info('[JioTV FFI] Successfully bound JioTVGoSendOTP, JioTVGoVerifyOTP, and JioTVGoSetDataDir functions');
+      } catch (e, st) {
+        talker.error('[JioTV FFI] Failed to lookup OTP/SetDataDir functions', e, st);
+      }
 
       _loaded = true;
+      talker.info('[JioTV FFI] JioTV-Go library loaded successfully');
       return true;
-    } catch (_) {
+    } catch (e, st) {
       _loaded = false;
+      talker.error('[JioTV FFI] Failed to load JioTV-Go shared library', e, st);
       return false;
     }
   }
 
   /// Starts the JioTV-Go server on the given [port] with data stored in [dataDir].
   /// Returns 0 on success, -1 on error.
-  int startServer({String port = '5001', required String dataDir}) {
+  int startServer({String port = '5050', required String dataDir}) {
     if (!_loaded) return -1;
 
     final portPtr = port.toNativeUtf8();
@@ -98,14 +113,36 @@ class JiotvGoFfi {
     }
   }
 
+  /// Sets the data directory in the Go bridge so that deferred
+  /// initialization (store, config, etc.) uses the correct path.
+  void setDataDir(String dataDir) {
+    if (!_loaded || _setDataDir == null) return;
+    final ptr = dataDir.toNativeUtf8();
+    try {
+      _setDataDir!(ptr);
+      talker.info('[JioTV FFI] Set data directory to $dataDir');
+    } finally {
+      calloc.free(ptr);
+    }
+  }
+
   /// Sends OTP to [number] directly via FFI.
   /// Returns 0 on success, -1 on error.
   int sendOtp(String number) {
-    if (!_loaded || _sendOtp == null) return -1;
+    if (!_loaded || _sendOtp == null) {
+      talker.warning('[JioTV FFI] Cannot send OTP: library loaded=$_loaded, sendOtp function bound=${_sendOtp != null}');
+      return -1;
+    }
 
     final numPtr = number.toNativeUtf8();
     try {
-      return _sendOtp!(numPtr);
+      talker.info('[JioTV FFI] Calling JioTVGoSendOTP for $number');
+      final res = _sendOtp!(numPtr);
+      talker.info('[JioTV FFI] JioTVGoSendOTP returned status: $res');
+      return res;
+    } catch (e, st) {
+      talker.error('[JioTV FFI] Exception in JioTVGoSendOTP', e, st);
+      return -1;
     } finally {
       calloc.free(numPtr);
     }
@@ -114,12 +151,21 @@ class JiotvGoFfi {
   /// Verifies OTP for [number] directly via FFI.
   /// Returns 0 on success, -1 on error.
   int verifyOtp(String number, String otp) {
-    if (!_loaded || _verifyOtp == null) return -1;
+    if (!_loaded || _verifyOtp == null) {
+      talker.warning('[JioTV FFI] Cannot verify OTP: library loaded=$_loaded, verifyOtp function bound=${_verifyOtp != null}');
+      return -1;
+    }
 
     final numPtr = number.toNativeUtf8();
     final otpPtr = otp.toNativeUtf8();
     try {
-      return _verifyOtp!(numPtr, otpPtr);
+      talker.info('[JioTV FFI] Calling JioTVGoVerifyOTP for $number with otp: $otp');
+      final res = _verifyOtp!(numPtr, otpPtr);
+      talker.info('[JioTV FFI] JioTVGoVerifyOTP returned status: $res');
+      return res;
+    } catch (e, st) {
+      talker.error('[JioTV FFI] Exception in JioTVGoVerifyOTP', e, st);
+      return -1;
     } finally {
       calloc.free(numPtr);
       calloc.free(otpPtr);
@@ -157,11 +203,13 @@ class JiotvGoFfi {
       // available by name via DynamicLibrary.open
       return 'libjiotv_go.so';
     } else if (Platform.isLinux) {
-      // Check next to the executable first, then system lib paths
+      // Check next to the executable first, then local linux/lib, then system lib paths
       final execDir = File(Platform.resolvedExecutable).parent.path;
+      final currentDir = Directory.current.path;
       final candidates = [
         '$execDir/lib/libjiotv_go.so',
         '$execDir/libjiotv_go.so',
+        '$currentDir/linux/lib/libjiotv_go.so',
         '/usr/local/lib/libjiotv_go.so',
       ];
       for (final path in candidates) {
@@ -170,9 +218,11 @@ class JiotvGoFfi {
       return null;
     } else if (Platform.isMacOS) {
       final execDir = File(Platform.resolvedExecutable).parent.path;
+      final currentDir = Directory.current.path;
       final candidates = [
         '$execDir/../Frameworks/libjiotv_go.dylib',
         '$execDir/libjiotv_go.dylib',
+        '$currentDir/macos/libjiotv_go.dylib',
       ];
       for (final path in candidates) {
         if (File(path).existsSync()) return path;
@@ -180,9 +230,11 @@ class JiotvGoFfi {
       return null;
     } else if (Platform.isWindows) {
       final execDir = File(Platform.resolvedExecutable).parent.path;
+      final currentDir = Directory.current.path;
       final candidates = [
         '$execDir\\jiotv_go.dll',
         '$execDir\\lib\\jiotv_go.dll',
+        '$currentDir\\windows\\jiotv_go.dll',
       ];
       for (final path in candidates) {
         if (File(path).existsSync()) return path;

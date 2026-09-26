@@ -3,21 +3,27 @@ import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:video_player/video_player.dart';
+import 'package:better_player_plus/better_player_plus.dart';
+import 'package:flutter/widgets.dart';
 import 'package:zaptv/core/services/talker_service.dart';
 
 /// Unified video controller for ZapTV.
-/// Uses media_kit on Desktop (Linux, Windows, macOS) and video_player on Mobile (Android, iOS).
+/// Uses media_kit on Desktop (Linux, Windows, macOS), BetterPlayer on Android (for DRM support), and video_player on other Mobile platforms.
 class ZapVideoController extends ChangeNotifier {
   Player? _mkPlayer;
   VideoController? _mkVideoController;
   VideoPlayerController? _vpController;
+  BetterPlayerController? _bpController;
 
   bool get isDesktop =>
       !kIsWeb && (Platform.isLinux || Platform.isWindows || Platform.isMacOS);
 
+  bool get isAndroid => !kIsWeb && Platform.isAndroid;
+
   Player? get mkPlayer => _mkPlayer;
   VideoController? get mkVideoController => _mkVideoController;
   VideoPlayerController? get vpController => _vpController;
+  BetterPlayerController? get bpController => _bpController;
 
   ZapVideoController() {
     if (isDesktop) {
@@ -38,13 +44,13 @@ class ZapVideoController extends ChangeNotifier {
     }
   }
 
-  Future<void> open(String url) async {
+  Future<void> open(String url, {String? licenseType, String? licenseKey}) async {
     if (!url.startsWith('http')) {
       talker.warning('Invalid video stream URL ignored: $url');
       return;
     }
 
-    talker.info('Opening video stream [$engineName]: $url');
+    talker.info('Opening video stream [$engineName]: $url (License Key: $licenseKey)');
 
     if (isDesktop) {
       try {
@@ -53,6 +59,54 @@ class ZapVideoController extends ChangeNotifier {
       } catch (e, st) {
         talker.handle(e, st, 'Failed to open video stream in MediaKit');
       }
+    } else if (isAndroid) {
+      final oldController = _bpController;
+
+      final drmConfig = licenseKey != null
+          ? BetterPlayerDrmConfiguration(
+              drmType: BetterPlayerDrmType.widevine,
+              licenseUrl: licenseKey,
+            )
+          : null;
+
+      BetterPlayerVideoFormat? videoFormat;
+      if (url.contains('.m3u8')) {
+        videoFormat = BetterPlayerVideoFormat.hls;
+      } else if (url.contains('/mpd/') || url.contains('.mpd')) {
+        videoFormat = BetterPlayerVideoFormat.dash;
+      }
+
+      final dataSource = BetterPlayerDataSource(
+        BetterPlayerDataSourceType.network,
+        url,
+        videoFormat: videoFormat,
+        drmConfiguration: drmConfig,
+      );
+
+      _bpController = BetterPlayerController(
+        const BetterPlayerConfiguration(
+          autoPlay: true,
+          looping: true,
+          fit: BoxFit.contain,
+          controlsConfiguration: BetterPlayerControlsConfiguration(
+            showControls: false,
+          ),
+        ),
+        betterPlayerDataSource: dataSource,
+      );
+
+      notifyListeners();
+
+      try {
+        talker.info('BetterPlayer android stream initialized');
+      } catch (e, st) {
+        talker.handle(e, st, 'Failed to initialize better_player_plus');
+      }
+
+      if (oldController != null) {
+        oldController.dispose();
+      }
+      notifyListeners();
     } else {
       final oldController = _vpController;
       _vpController = VideoPlayerController.networkUrl(Uri.parse(url));
@@ -72,12 +126,17 @@ class ZapVideoController extends ChangeNotifier {
     }
   }
 
-  String get engineName => isDesktop ? 'MediaKit (Desktop)' : 'VideoPlayer (Mobile)';
+  String get engineName {
+    if (isDesktop) return 'MediaKit (Desktop)';
+    if (isAndroid) return 'BetterPlayer (Android)';
+    return 'VideoPlayer (Mobile)';
+  }
 
   @override
   void dispose() {
     talker.info('Disposing ZapVideoController ($engineName)');
     _mkPlayer?.dispose();
+    _bpController?.dispose();
     _vpController?.dispose();
     super.dispose();
   }

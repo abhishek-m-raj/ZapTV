@@ -7,6 +7,9 @@ import 'package:zaptv/app/home/domain/repository/home_repository.dart';
 import 'package:zaptv/core/services/talker_service.dart';
 import 'package:zaptv/core/shared/failures.dart';
 
+import 'package:zaptv/core/config/locator.dart';
+import 'package:zaptv/core/services/jiotvgo_process_service.dart';
+
 class HomeRepositoryImpl implements HomeRepository {
   final IptvorgRemoteDataSource iptvRemoteDataSource;
   final JiotvGoRemoteDataSource jiotvGoRemoteDataSource;
@@ -22,6 +25,14 @@ class HomeRepositoryImpl implements HomeRepository {
 
     List<Channel> jioChannels = [];
     List<Channel> iptvChannels = [];
+
+    final jioService = loc<JiotvGoProcessService>();
+
+    // Always try to fetch JioTV channels if the server is reachable.
+    // Don't gate on isLoggedIn() — it's unreliable after a fresh login
+    // because the server may need a restart to pick up new credentials.
+    // The datasource will gracefully return an empty list if not authenticated.
+    await jioService.ensureRunning();
 
     try {
       jioChannels = await jiotvGoRemoteDataSource.getAllChannels();
@@ -55,6 +66,8 @@ class HomeRepositoryImpl implements HomeRepository {
         image: entity.image,
         group: entity.group,
         streamUrl: entity.streamUrl,
+        licenseType: entity.licenseType,
+        licenseKey: entity.licenseKey,
       );
     }).toList();
 

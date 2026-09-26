@@ -6,6 +6,7 @@ import 'package:zaptv/core/config/locator.dart';
 import 'package:zaptv/core/services/jiotvgo_process_service.dart';
 import 'package:zaptv/core/services/zap_video_controller.dart';
 import 'package:zaptv/core/widgets/zap_video_view.dart';
+import 'package:zaptv/core/widgets/tv_focusable_button.dart';
 
 class MenuPage extends StatefulWidget {
   final ZapVideoController videoController;
@@ -13,6 +14,7 @@ class MenuPage extends StatefulWidget {
   final List<ChannelEntity> channels;
   final Function(ChannelEntity) onChannelSelected;
   final VoidCallback onPop;
+  final VoidCallback? onJioLoginSuccess;
 
   const MenuPage({
     super.key,
@@ -21,6 +23,7 @@ class MenuPage extends StatefulWidget {
     required this.channels,
     required this.onChannelSelected,
     required this.onPop,
+    this.onJioLoginSuccess,
   });
 
   @override
@@ -75,32 +78,6 @@ class _MenuPageState extends State<MenuPage> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text("ZapTV"),
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 12.0),
-              child: ElevatedButton.icon(
-                style: _isJioLoggedIn
-                    ? ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green.shade800,
-                        foregroundColor: Colors.white,
-                      )
-                    : null,
-                onPressed: () async {
-                  final result = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => const JiotvLoginDialog(),
-                  );
-                  if (result == true) {
-                    _checkJioLoginStatus();
-                  }
-                },
-                icon: Icon(_isJioLoggedIn ? Icons.check_circle : Icons.login),
-                label: Text(
-                  _isJioLoggedIn ? "JioTV: Logged In" : "JioTV Login",
-                ),
-              ),
-            ),
-          ],
         ),
         body: Padding(
           padding: EdgeInsets.all(15),
@@ -108,14 +85,39 @@ class _MenuPageState extends State<MenuPage> {
             children: [
               Expanded(
                 flex: 2,
-                child: Container(
-                  clipBehavior: Clip.hardEdge,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    color: Colors.transparent,
-                    border: Border.all(color: Colors.white),
-                  ),
-                  child: ListView.separated(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TvFocusableButton(
+                      isJioLoggedIn: _isJioLoggedIn,
+                      onPressed: () async {
+                        final result = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => const JiotvLoginDialog(),
+                        );
+                        if (result == true) {
+                          _checkJioLoginStatus();
+                          widget.onJioLoginSuccess?.call();
+                          if (context.mounted) {
+                            Navigator.of(context).pop();
+                          }
+                        }
+                      },
+                      icon: Icon(_isJioLoggedIn ? Icons.check_circle : Icons.login),
+                      label: Text(
+                        _isJioLoggedIn ? "JioTV: Logged In" : "JioTV Login",
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: Container(
+                        clipBehavior: Clip.hardEdge,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          color: Colors.transparent,
+                          border: Border.all(color: Colors.white),
+                        ),
+                        child: ListView.separated(
                     controller: _scrollController,
                     clipBehavior: Clip.hardEdge,
                     itemCount: widget.channels.length,
@@ -137,7 +139,10 @@ class _MenuPageState extends State<MenuPage> {
                   ),
                 ),
               ),
-              SizedBox(width: 8),
+            ],
+          ),
+        ),
+          const SizedBox(width: 8),
               Expanded(
                 child: Container(
                   clipBehavior: Clip.antiAlias,
@@ -238,3 +243,5 @@ class _ChannelListTileState extends State<ChannelListTile> {
     );
   }
 }
+
+

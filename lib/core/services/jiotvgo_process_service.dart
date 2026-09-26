@@ -8,8 +8,7 @@ import 'package:zaptv/core/services/talker_service.dart';
 
 /// Pure FFI manager for the JioTV-Go server.
 class JiotvGoProcessService {
-  static const String baseUrl = 'http://localhost:5001';
-  static const Duration _startupWait = Duration(seconds: 3);
+  static const String baseUrl = 'http://localhost:5050';
 
   final JiotvGoFfi _ffi = JiotvGoFfi();
   bool _isStarting = false;
@@ -36,10 +35,10 @@ class JiotvGoProcessService {
 
       final dataDir = await _getDataDir();
       talker.info('[JioTV FFI] Starting JioTV-Go server with dataDir=$dataDir');
-      final result = _ffi.startServer(port: '5001', dataDir: dataDir);
+      final result = _ffi.startServer(port: '5050', dataDir: dataDir);
       if (result == 0) {
-        talker.info('[JioTV FFI] Server started successfully, waiting for port binding...');
-        await Future.delayed(_startupWait);
+        talker.info('[JioTV FFI] Server started successfully, waiting for it to become ready...');
+        await _waitForServerReady();
       } else {
         final err = _ffi.getLastError();
         talker.error('[JioTV FFI] Server start error: $err');
@@ -49,6 +48,24 @@ class JiotvGoProcessService {
     } finally {
       _isStarting = false;
     }
+  }
+
+  /// Ensure the server is running. If not, start it and wait for it to be ready.
+  Future<void> ensureRunning() async {
+    if (await isServerRunning()) return;
+    await initAndStart();
+  }
+
+  /// Poll until the server responds or timeout after ~10 seconds.
+  Future<void> _waitForServerReady() async {
+    for (int i = 0; i < 10; i++) {
+      await Future.delayed(const Duration(seconds: 1));
+      if (await isServerRunning()) {
+        talker.info('[JioTV FFI] Server is ready after ${i + 1}s');
+        return;
+      }
+    }
+    talker.warning('[JioTV FFI] Server did not become ready within 10s');
   }
 
   /// Returns true if the JioTV-Go HTTP server is reachable.
@@ -64,14 +81,18 @@ class JiotvGoProcessService {
   }
 
   /// Returns true if the server has a valid authenticated session.
+  /// Ensures the server is running before checking.
   Future<bool> isLoggedIn() async {
     try {
+      // Make sure the server is actually up before checking login
+      await ensureRunning();
+
       final response = await http
-          .get(Uri.parse('$baseUrl/channels'))
-          .timeout(const Duration(seconds: 3));
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data is List && data.isNotEmpty) return true;
+          .get(Uri.parse('$baseUrl/playlist.m3u'))
+          .timeout(const Duration(seconds: 5));
+      if (response.statusCode == 200 && response.body.contains('#EXTM3U')) {
+        // If the playlist has channels (body length > 100), we are logged in.
+        return response.body.length > 100;
       }
       return false;
     } catch (_) {
@@ -93,16 +114,25 @@ class JiotvGoProcessService {
 
   Future<Map<String, dynamic>> sendOtp(String mobileNumber) async {
     final formatted = _formatMobile(mobileNumber);
+    talker.info('[ProcessService] Sending OTP to $formatted');
 
-    if (_ffi.isLoaded) {
-      final res = _ffi.sendOtp(formatted);
-      if (res == 0) {
+    // Bypass FFI because modifying credentials via FFI doesn't update the 
+    // running HTTP server's memory. Hit the HTTP server directly.
+    final url = '$baseUrl/login/sendOTP';
+    talker.info('[ProcessService] Trying HTTP fallback: $url');
+    try {
+      final res = await http.post(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'mobile': formatted}),
+      ).timeout(const Duration(seconds: 5));
+      talker.info('[ProcessService] HTTP response code: ${res.statusCode}, body: ${res.body}');
+      if (res.statusCode == 200) {
+        talker.info('[ProcessService] OTP sent successfully via HTTP fallback');
         return {'success': true, 'message': 'OTP sent successfully'};
       }
-      final err = _ffi.getLastError();
-      if (err != null && err.isNotEmpty) {
-        return {'success': false, 'message': err};
-      }
+    } catch (e, st) {
+      talker.error('[ProcessService] HTTP fallback sendOtp failed', e, st);
     }
 
     return {
@@ -114,22 +144,57 @@ class JiotvGoProcessService {
   Future<Map<String, dynamic>> verifyOtp(
       String mobileNumber, String otp) async {
     final formatted = _formatMobile(mobileNumber);
+    talker.info('[ProcessService] Verifying OTP for $formatted (OTP length: ${otp.length})');
 
-    if (_ffi.isLoaded) {
-      final res = _ffi.verifyOtp(formatted, otp);
-      if (res == 0) {
+    // Bypass FFI because modifying credentials via FFI doesn't update the 
+    // running HTTP server's memory. Hit the HTTP server directly.
+    final url = '$baseUrl/login/verifyOTP';
+    talker.info('[ProcessService] Trying HTTP fallback: $url');
+    try {
+      final res = await http.post(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'mobile': formatted, 'otp': otp}),
+      ).timeout(const Duration(seconds: 5));
+      talker.info('[ProcessService] HTTP response code: ${res.statusCode}, body: ${res.body}');
+      if (res.statusCode == 200) {
+        talker.info('[ProcessService] OTP verified successfully via HTTP fallback');
         return {'success': true, 'message': 'OTP verified successfully'};
       }
-      final err = _ffi.getLastError();
-      if (err != null && err.isNotEmpty) {
-        return {'success': false, 'message': err};
-      }
+    } catch (e, st) {
+      talker.error('[ProcessService] HTTP fallback verifyOtp failed', e, st);
     }
 
     return {
       'success': false,
       'message': 'Failed to verify OTP. Please check the code.',
     };
+  }
+
+  /// Restart the server so it reloads credentials from disk.
+  /// Needed after login via FFI — the already-running server won't
+  /// pick up newly saved credentials without a restart.
+  Future<void> restartServer() async {
+    talker.info('[JioTV FFI] Restarting server to reload credentials...');
+    stopServer();
+
+    // Poll until the server actually stops (up to 5 seconds)
+    bool stopped = false;
+    for (int i = 0; i < 20; i++) {
+      await Future.delayed(const Duration(milliseconds: 250));
+      if (!await isServerRunning()) {
+        talker.info('[JioTV FFI] Server stopped after ${(i + 1) * 250}ms');
+        stopped = true;
+        break;
+      }
+    }
+
+    if (!stopped) {
+      talker.warning('[JioTV FFI] Server did not stop within 5s, forcing restart...');
+    }
+
+    _isStarting = false; // Reset the guard so initAndStart() can proceed
+    await initAndStart();
   }
 
   void stopServer() {

@@ -6,13 +6,17 @@ class Channel{
   final String image;
   final String group;
   final String streamUrl;
+  final String? licenseType;
+  final String? licenseKey;
 
   const Channel({
     required this.id,
     required this.name,
     required this.image,
     required this.group,
-    required this.streamUrl
+    required this.streamUrl,
+    this.licenseType,
+    this.licenseKey,
   });
 
   ChannelEntity toEntity() {
@@ -21,7 +25,9 @@ class Channel{
       name: name,
       image: image,
       group: group,
-      streamUrl: streamUrl
+      streamUrl: streamUrl,
+      licenseType: licenseType,
+      licenseKey: licenseKey,
     );
   }
 }

@@ -30,49 +30,68 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   HomeLoadedState get currentState => state as HomeLoadedState;
 
   FutureOr<void> homeInitialEvent(HomeInitialEvent event, Emitter<HomeState> emit) async {
-    (await getChannels.execute()).fold(
-      (_) {}, 
-      (r) async {
+    final result = await getChannels.execute();
+    result.fold(
+      (_) {},
+      (r) {
+        if (r.isEmpty) return;
+        final initialChannel = r.first;
         emit(
           HomeLoadedState(
-            currentChannel: r.first,
-            channels: r
-          )
+            currentChannel: initialChannel,
+            channels: r,
+          ),
         );
-        if (!currentState.currentChannel.streamUrl.startsWith("http")) return;
+        if (!initialChannel.streamUrl.startsWith("http")) return;
         try {
-          videoController.open(currentState.currentChannel.streamUrl);
+          videoController.open(
+            initialChannel.streamUrl,
+            licenseType: initialChannel.licenseType,
+            licenseKey: initialChannel.licenseKey,
+          );
         } catch (_) {}
-      }
+      },
     );
   }
 
   FutureOr<void> homePreviousChannelEvent(HomePreviousChannelEvent event, Emitter<HomeState> emit) async {
     if (state is! HomeLoadedState) return;
-    if (currentState.channels.indexOf(currentState.currentChannel) != 0) {
+    final currentIndex = currentState.channels.indexOf(currentState.currentChannel);
+    if (currentIndex > 0) {
+      final targetChannel = currentState.channels[currentIndex - 1];
       emit(
         currentState.copyWith(
-          currentChannel: currentState.channels[currentState.channels.indexOf(currentState.currentChannel) - 1]
-        )
+          currentChannel: targetChannel,
+        ),
       );
-      if (!currentState.currentChannel.streamUrl.startsWith("http")) return;
+      if (!targetChannel.streamUrl.startsWith("http")) return;
       try {
-        videoController.open(currentState.currentChannel.streamUrl);
+        videoController.open(
+          targetChannel.streamUrl,
+          licenseType: targetChannel.licenseType,
+          licenseKey: targetChannel.licenseKey,
+        );
       } catch (_) {}
     }
   }
 
   FutureOr<void> homeNextChannelEvent(HomeNextChannelEvent event, Emitter<HomeState> emit) async {
     if (state is! HomeLoadedState) return;
-    if (currentState.channels.indexOf(currentState.currentChannel) != (currentState.channels.length-1)) {
+    final currentIndex = currentState.channels.indexOf(currentState.currentChannel);
+    if (currentIndex >= 0 && currentIndex < currentState.channels.length - 1) {
+      final targetChannel = currentState.channels[currentIndex + 1];
       emit(
         currentState.copyWith(
-          currentChannel: currentState.channels[currentState.channels.indexOf(currentState.currentChannel) + 1]
-        )
+          currentChannel: targetChannel,
+        ),
       );
-      if (!currentState.currentChannel.streamUrl.startsWith("http")) return;
+      if (!targetChannel.streamUrl.startsWith("http")) return;
       try {
-        videoController.open(currentState.currentChannel.streamUrl);
+        videoController.open(
+          targetChannel.streamUrl,
+          licenseType: targetChannel.licenseType,
+          licenseKey: targetChannel.licenseKey,
+        );
       } catch (_) {}
     }
   }
@@ -81,21 +100,26 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     if (state is! HomeLoadedState) return;
     emit(
       currentState.copyWith(
-        showChannelInfo: event.shouldShow
-      )
+        showChannelInfo: event.shouldShow,
+      ),
     );
   }
 
   FutureOr<void> homeSelectChannelEvent(HomeSelectChannelEvent event, Emitter<HomeState> emit) async {
     if (state is! HomeLoadedState) return;
+    final targetChannel = event.channel;
     emit(
       currentState.copyWith(
-        currentChannel: event.channel
-      )
+        currentChannel: targetChannel,
+      ),
     );
-    if (!currentState.currentChannel.streamUrl.startsWith("http")) return;
+    if (!targetChannel.streamUrl.startsWith("http")) return;
     try {
-      videoController.open(currentState.currentChannel.streamUrl);
+      videoController.open(
+        targetChannel.streamUrl,
+        licenseType: targetChannel.licenseType,
+        licenseKey: targetChannel.licenseKey,
+      );
     } catch (_) {}
   }
 }
