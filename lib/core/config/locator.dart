@@ -7,6 +7,7 @@ import 'package:zaptv/app/home/domain/repository/home_repository.dart';
 import 'package:zaptv/app/home/domain/usecase/get_channels.dart';
 import 'package:zaptv/core/services/hive_db.dart';
 import 'package:zaptv/core/services/jiotvgo_process_service.dart';
+import 'package:zaptv/core/services/settings_service.dart';
 
 final GetIt loc = GetIt.instance;
 
@@ -16,7 +17,11 @@ Future<void> setupLocator() async {
     await instance.init();
     return instance;
   });
-  
+
+  loc.registerLazySingleton<SettingsService>(
+    () => SettingsService(hiveDb: loc<HiveDb>()),
+  );
+
   final jiotvService = JiotvGoProcessService();
   loc.registerSingleton<JiotvGoProcessService>(jiotvService);
   // Auto-start JioTV-Go background process asynchronously
@@ -32,4 +37,3 @@ Future<void> setupLocator() async {
   );
   loc.registerFactory(() => GetChannels(homeRepository: loc()));
 }
-

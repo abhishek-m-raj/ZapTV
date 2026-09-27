@@ -10,13 +10,16 @@ class HomeNextChannelEvent extends HomeEvent {}
 
 class HomeShowChannelInfoEvent extends HomeEvent {
   final bool shouldShow;
-  HomeShowChannelInfoEvent([
-    this.shouldShow = true
-  ]);
+  HomeShowChannelInfoEvent([this.shouldShow = true]);
 }
 
 class HomeSelectChannelEvent extends HomeEvent {
   final ChannelEntity channel;
   final List<ChannelEntity>? activePlaylist;
-  HomeSelectChannelEvent(this.channel, {this.activePlaylist});
+  final int? categoryIndex;
+  HomeSelectChannelEvent(
+    this.channel, {
+    this.activePlaylist,
+    this.categoryIndex,
+  });
 }

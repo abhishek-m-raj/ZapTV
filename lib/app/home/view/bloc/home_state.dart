@@ -11,25 +11,29 @@ class HomeLoadedState extends HomeState {
   final List<ChannelEntity> channels; // Active playlist
   final List<ChannelEntity> allChannels;
   final bool showChannelInfo;
+  final int categoryIndex;
 
   HomeLoadedState({
     required this.currentChannel,
     required this.channels,
     required this.allChannels,
-    this.showChannelInfo = false
+    this.showChannelInfo = false,
+    this.categoryIndex = 0,
   });
 
   HomeLoadedState copyWith({
     ChannelEntity? currentChannel,
     List<ChannelEntity>? channels,
     List<ChannelEntity>? allChannels,
-    bool? showChannelInfo
+    bool? showChannelInfo,
+    int? categoryIndex,
   }) {
     return HomeLoadedState(
       currentChannel: currentChannel ?? this.currentChannel,
       channels: channels ?? this.channels,
       allChannels: allChannels ?? this.allChannels,
-      showChannelInfo: showChannelInfo ?? this.showChannelInfo
+      showChannelInfo: showChannelInfo ?? this.showChannelInfo,
+      categoryIndex: categoryIndex ?? this.categoryIndex,
     );
   }
 }

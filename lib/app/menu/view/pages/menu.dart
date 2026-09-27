@@ -5,16 +5,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:zaptv/app/home/domain/entities/channel.dart';
 import 'package:zaptv/app/menu/view/widgets/channel_options_dialog.dart';
+import 'package:zaptv/app/menu/view/widgets/collapsible_sidebar.dart';
 import 'package:zaptv/app/menu/view/widgets/jiotv_login_dialog.dart';
+import 'package:zaptv/app/settings/view/pages/settings_page.dart';
 import 'package:zaptv/core/config/locator.dart';
 import 'package:zaptv/core/services/hive_db.dart';
 import 'package:zaptv/core/services/jiotvgo_process_service.dart';
-import 'package:zaptv/core/widgets/tv_focusable_button.dart';
 
 class MenuPage extends StatefulWidget {
   final ChannelEntity currentChannel;
   final List<ChannelEntity> channels;
-  final Function(ChannelEntity, List<ChannelEntity>) onChannelSelected;
+  final int initialCategoryIndex;
+  final Function(
+    ChannelEntity channel,
+    List<ChannelEntity> playlist,
+    int categoryIndex,
+  )
+  onChannelSelected;
   final VoidCallback onPop;
   final VoidCallback? onJioLoginSuccess;
 
@@ -22,6 +29,7 @@ class MenuPage extends StatefulWidget {
     super.key,
     required this.currentChannel,
     required this.channels,
+    this.initialCategoryIndex = 0,
     required this.onChannelSelected,
     required this.onPop,
     this.onJioLoginSuccess,
@@ -32,25 +40,34 @@ class MenuPage extends StatefulWidget {
 }
 
 class _MenuPageState extends State<MenuPage> {
+  final GlobalKey<CollapsibleSidebarState> _sidebarKey =
+      GlobalKey<CollapsibleSidebarState>();
+
   late ChannelEntity currentChannel;
   bool _isJioLoggedIn = false;
-  int _selectedCategoryIndex = 0; // 0: All, 1: Favorites, 2: JioTV, 3: IPTV
+  late int _selectedCategoryIndex; // 0: All, 1: Favorites, 2: JioTV, 3: IPTV
   final HiveDb _hiveDb = loc<HiveDb>();
 
-  // Cached lists to avoid filtering hundreds/thousands of channels on every frame
+  // Channel Lists
   late final List<ChannelEntity> _allChannels;
   late final List<ChannelEntity> _jioChannels;
   late final List<ChannelEntity> _iptvChannels;
   List<ChannelEntity> _displayedChannels = const [];
 
-  // ValueNotifier for focused channel to update ONLY preview header without rebuilding entire grid
   late final ValueNotifier<ChannelEntity?> _focusedChannelNotifier;
+
+  // Managed FocusNodes for Grid channel tiles to guarantee focus restoration
+  final Map<String, FocusNode> _tileFocusNodes = {};
+  late final FocusNode _emptyStateFocusNode;
+
+  bool _isSidebarOpen = false;
+  bool _hasInitiallyAutofocused = false;
 
   @override
   void initState() {
     super.initState();
     currentChannel = widget.currentChannel;
-    _focusedChannelNotifier = ValueNotifier<ChannelEntity?>(currentChannel);
+    _selectedCategoryIndex = widget.initialCategoryIndex;
 
     _allChannels = widget.channels;
     _jioChannels = widget.channels
@@ -61,13 +78,44 @@ class _MenuPageState extends State<MenuPage> {
         .toList();
     _updateDisplayedChannels();
 
+    final hasCurrent = _displayedChannels.any((c) => c.id == currentChannel.id);
+    _focusedChannelNotifier = ValueNotifier<ChannelEntity?>(
+      hasCurrent
+          ? currentChannel
+          : (_displayedChannels.isNotEmpty
+                ? _displayedChannels.first
+                : currentChannel),
+    );
+
+    _emptyStateFocusNode = FocusNode(debugLabel: 'GridEmptyState');
+
     _checkJioLoginStatus();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {
+          _hasInitiallyAutofocused = true;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     _focusedChannelNotifier.dispose();
+    _emptyStateFocusNode.dispose();
+    for (final node in _tileFocusNodes.values) {
+      node.dispose();
+    }
+    _tileFocusNodes.clear();
     super.dispose();
+  }
+
+  FocusNode _getTileFocusNode(String channelId) {
+    return _tileFocusNodes.putIfAbsent(
+      channelId,
+      () => FocusNode(debugLabel: 'ChannelTile_$channelId'),
+    );
   }
 
   void _updateDisplayedChannels() {
@@ -115,8 +163,10 @@ class _MenuPageState extends State<MenuPage> {
         _focusedChannelNotifier.value = _displayedChannels.isNotEmpty
             ? _displayedChannels.first
             : null;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _focusCurrentOrFirstChannel();
+        });
       } else if (_focusedChannelNotifier.value == channel) {
-        // Trigger ValueNotifier update to refresh favorite star in header
         _focusedChannelNotifier.value = null;
         _focusedChannelNotifier.value = channel;
       }
@@ -132,7 +182,7 @@ class _MenuPageState extends State<MenuPage> {
         isFavorite: _isFavorite(channel),
         onToggleFavorite: () => _toggleFavorite(channel),
         onPlay: () {
-          widget.onChannelSelected(channel, displayed);
+          widget.onChannelSelected(channel, displayed, _selectedCategoryIndex);
           setState(() {
             currentChannel = channel;
           });
@@ -152,114 +202,158 @@ class _MenuPageState extends State<MenuPage> {
     });
   }
 
+  /// Transfer focus from Grid into Sidebar
+  void _enterSidebar() {
+    _sidebarKey.currentState?.focusActiveCategory();
+  }
+
+  /// Transfer focus from Sidebar back to Grid
+  void _exitSidebarToGrid({int? newCategoryIndex}) {
+    if (newCategoryIndex != null &&
+        newCategoryIndex != _selectedCategoryIndex) {
+      _onCategorySelect(newCategoryIndex);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _focusCurrentOrFirstChannel();
+      });
+    } else {
+      _focusCurrentOrFirstChannel();
+    }
+  }
+
+  /// Focus either the currently active channel or first channel in the grid
+  void _focusCurrentOrFirstChannel() {
+    if (_displayedChannels.isEmpty) {
+      _emptyStateFocusNode.requestFocus();
+      return;
+    }
+
+    // 1. Try active previewed channel if it exists in the displayed channels
+    final active = _focusedChannelNotifier.value;
+    if (active != null && _displayedChannels.any((c) => c.id == active.id)) {
+      final node = _tileFocusNodes[active.id];
+      if (node != null && node.canRequestFocus && node.context != null) {
+        node.requestFocus();
+        return;
+      }
+    }
+
+    // 2. Otherwise focus first channel in list
+    final first = _displayedChannels.first;
+    final firstNode = _getTileFocusNode(first.id);
+    if (firstNode.canRequestFocus && firstNode.context != null) {
+      firstNode.requestFocus();
+      _focusedChannelNotifier.value = first;
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (firstNode.canRequestFocus && firstNode.context != null) {
+          firstNode.requestFocus();
+          _focusedChannelNotifier.value = first;
+        }
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final displayed = _displayedChannels;
+    final favoritesCount = widget.channels.where((c) => _isFavorite(c)).length;
 
     return PopScope(
+      canPop: !_isSidebarOpen,
       onPopInvokedWithResult: (didPop, result) {
-        if (didPop) {
+        if (!didPop && _isSidebarOpen) {
+          // If Back pressed while inside the sidebar, safely return to grid
+          _exitSidebarToGrid();
+        } else if (didPop) {
           widget.onPop();
         }
       },
       child: Scaffold(
-        backgroundColor: Colors.black87,
+        backgroundColor: const Color(0xFF0C0C14),
         body: Row(
           children: [
-            // LEFT NAVIGATION RAIL
-            Container(
-              width: 260,
-              color: theme.colorScheme.surface.withValues(alpha: 0.8),
-              child: Column(
-                children: [
-                  const SizedBox(height: 40),
-                  Text(
-                    "ZapTV",
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-                  _SideMenuItem(
-                    icon: Icons.tv,
-                    label: "All Channels",
-                    isSelected: _selectedCategoryIndex == 0,
-                    onFocus: () => _onCategorySelect(0),
-                  ),
-                  _SideMenuItem(
-                    icon: Icons.star,
-                    label: "Favorites",
-                    isSelected: _selectedCategoryIndex == 1,
-                    onFocus: () => _onCategorySelect(1),
-                  ),
-                  _SideMenuItem(
-                    icon: Icons.cell_tower,
-                    label: "JioTV",
-                    isSelected: _selectedCategoryIndex == 2,
-                    onFocus: () => _onCategorySelect(2),
-                  ),
-                  _SideMenuItem(
-                    icon: Icons.public,
-                    label: "IPTV",
-                    isSelected: _selectedCategoryIndex == 3,
-                    onFocus: () => _onCategorySelect(3),
-                  ),
-                  const Spacer(),
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: TvFocusableButton(
-                      isJioLoggedIn: _isJioLoggedIn,
-                      onPressed: () async {
-                        final result = await showDialog<bool>(
-                          context: context,
-                          builder: (context) => const JiotvLoginDialog(),
-                        );
-                        if (result == true) {
-                          _checkJioLoginStatus();
-                          widget.onJioLoginSuccess?.call();
-                        }
+            // COLLAPSIBLE YOUTUBE-STYLE SIDEBAR
+            CollapsibleSidebar(
+              key: _sidebarKey,
+              selectedCategoryIndex: _selectedCategoryIndex,
+              allCount: _allChannels.length,
+              favoritesCount: favoritesCount,
+              jioCount: _jioChannels.length,
+              iptvCount: _iptvChannels.length,
+              isJioLoggedIn: _isJioLoggedIn,
+              onExpansionChanged: (open) {
+                if (_isSidebarOpen != open) {
+                  setState(() => _isSidebarOpen = open);
+                }
+              },
+              onCategorySelected: _onCategorySelect,
+              onExitRightFromCategory: (catIndex) {
+                _exitSidebarToGrid(newCategoryIndex: catIndex);
+              },
+              onExitRightFromAction: () {
+                _exitSidebarToGrid();
+              },
+              onJioLoginPressed: () async {
+                final result = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => const JiotvLoginDialog(),
+                );
+                if (result == true) {
+                  _checkJioLoginStatus();
+                  widget.onJioLoginSuccess?.call();
+                }
+              },
+              onSettingsPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => SettingsPage(
+                      onJioLoginSuccess: () {
+                        _checkJioLoginStatus();
+                        widget.onJioLoginSuccess?.call();
                       },
-                      icon: Icon(
-                        _isJioLoggedIn ? Icons.check_circle : Icons.login,
-                      ),
-                      label: Text(
-                        _isJioLoggedIn ? "JioTV: Logged In" : "JioTV Login",
-                      ),
                     ),
                   ),
-                  const SizedBox(height: 20),
-                ],
-              ),
+                );
+                _checkJioLoginStatus();
+              },
             ),
-            // MAIN CONTENT AREA
+
+            // MAIN CONTENT (TOP CHANNEL PREVIEW & CHANNEL GRID)
             Expanded(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // TOP HEADER / PREVIEW (Listening to ValueNotifier: only this rebuilds on focus!)
+                  // TOP CHANNEL PREVIEW HEADER
                   ValueListenableBuilder<ChannelEntity?>(
                     valueListenable: _focusedChannelNotifier,
-                    builder: (context, focusedChannel, _) {
-                      final activeChannel = focusedChannel ?? currentChannel;
+                    builder: (context, activeChannel, child) {
+                      if (activeChannel == null) {
+                        return const SizedBox(height: 200);
+                      }
 
                       return Container(
-                        height: 220,
-                        padding: const EdgeInsets.all(24.0),
+                        height: 200,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 28.0,
+                          vertical: 20.0,
+                        ),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              theme.colorScheme.surface.withValues(alpha: 0.6),
-                              Colors.transparent,
+                              const Color(0xFF161626).withValues(alpha: 0.9),
+                              const Color(0xFF0C0C14).withValues(alpha: 0.0),
                             ],
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
                           ),
                         ),
                         child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
+                            // Channel Details
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -267,10 +361,11 @@ class _MenuPageState extends State<MenuPage> {
                                 children: [
                                   Text(
                                     activeChannel.name,
-                                    style: theme.textTheme.displaySmall
+                                    style: theme.textTheme.headlineMedium
                                         ?.copyWith(
-                                          fontWeight: FontWeight.bold,
+                                          fontWeight: FontWeight.w800,
                                           color: Colors.white,
+                                          letterSpacing: -0.5,
                                         ),
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
@@ -280,35 +375,118 @@ class _MenuPageState extends State<MenuPage> {
                                     children: [
                                       Container(
                                         padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
+                                          horizontal: 10,
                                           vertical: 4,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: theme.colorScheme.primary,
+                                          gradient: LinearGradient(
+                                            colors: [
+                                              theme.colorScheme.primary,
+                                              theme.colorScheme.tertiary,
+                                            ],
+                                          ),
                                           borderRadius: BorderRadius.circular(
-                                            4,
+                                            6,
                                           ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: theme.colorScheme.primary
+                                                  .withValues(alpha: 0.4),
+                                              blurRadius: 8,
+                                              spreadRadius: 1,
+                                            ),
+                                          ],
                                         ),
-                                        child: const Text(
-                                          "LIVE",
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 12,
-                                          ),
+                                        child: const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              Icons.fiber_manual_record,
+                                              color: Colors.white,
+                                              size: 8,
+                                            ),
+                                            SizedBox(width: 5),
+                                            Text(
+                                              "LIVE",
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w900,
+                                                fontSize: 11,
+                                                color: Colors.white,
+                                                letterSpacing: 0.8,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        activeChannel.group,
-                                        style: theme.textTheme.titleMedium
-                                            ?.copyWith(color: Colors.white70),
-                                      ),
+                                      if (activeChannel.group.isNotEmpty) ...[
+                                        const SizedBox(width: 10),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withValues(
+                                              alpha: 0.08,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
+                                            border: Border.all(
+                                              color: Colors.white.withValues(
+                                                alpha: 0.12,
+                                              ),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            activeChannel.group,
+                                            style: const TextStyle(
+                                              color: Colors.white70,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                       if (_isFavorite(activeChannel)) ...[
-                                        const SizedBox(width: 8),
-                                        const Icon(
-                                          Icons.star,
-                                          color: Colors.amber,
-                                          size: 20,
+                                        const SizedBox(width: 10),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.amber.withValues(
+                                              alpha: 0.15,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
+                                            border: Border.all(
+                                              color: Colors.amber.withValues(
+                                                alpha: 0.3,
+                                              ),
+                                            ),
+                                          ),
+                                          child: const Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.star_rounded,
+                                                color: Colors.amber,
+                                                size: 14,
+                                              ),
+                                              SizedBox(width: 4),
+                                              Text(
+                                                "Favorite",
+                                                style: TextStyle(
+                                                  color: Colors.amber,
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ],
                                     ],
@@ -316,42 +494,54 @@ class _MenuPageState extends State<MenuPage> {
                                 ],
                               ),
                             ),
-                            const SizedBox(width: 24),
+                            const SizedBox(width: 28),
+                            // Channel Logo Card Preview
                             Container(
-                              width: 300,
+                              width: 240,
+                              height: 140,
                               clipBehavior: Clip.antiAlias,
                               decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(12),
+                                color: const Color(0xFF181826),
+                                borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: Colors.white24,
-                                  width: 2,
+                                  color: Colors.white.withValues(alpha: 0.15),
+                                  width: 1.5,
                                 ),
-                                boxShadow: const [
+                                boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black54,
-                                    blurRadius: 10,
+                                    color: Colors.black.withValues(alpha: 0.6),
+                                    blurRadius: 16,
                                     spreadRadius: 2,
+                                    offset: const Offset(0, 4),
                                   ),
                                 ],
                               ),
-                              child: CachedNetworkImage(
-                                imageUrl: activeChannel.image,
-                                fit: BoxFit.contain,
-                                memCacheWidth: 400,
-                                fadeInDuration: const Duration(
-                                  milliseconds: 150,
-                                ),
-                                placeholder: (context, url) => const Icon(
-                                  Icons.tv,
-                                  size: 80,
-                                  color: Colors.white24,
-                                ),
-                                errorWidget: (context, url, error) =>
-                                    const Icon(
-                                      Icons.tv,
-                                      size: 80,
-                                      color: Colors.white24,
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.all(16.0),
+                                    child: CachedNetworkImage(
+                                      imageUrl: activeChannel.image,
+                                      fit: BoxFit.contain,
+                                      memCacheWidth: 400,
+                                      fadeInDuration: const Duration(
+                                        milliseconds: 150,
+                                      ),
+                                      placeholder: (context, url) => const Icon(
+                                        Icons.tv_rounded,
+                                        size: 60,
+                                        color: Colors.white24,
+                                      ),
+                                      errorWidget: (context, url, error) =>
+                                          const Icon(
+                                            Icons.tv_rounded,
+                                            size: 60,
+                                            color: Colors.white24,
+                                          ),
                                     ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
@@ -359,16 +549,39 @@ class _MenuPageState extends State<MenuPage> {
                       );
                     },
                   ),
+
                   // GRID OF CHANNELS
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24.0),
                       child: displayed.isEmpty
-                          ? Center(
-                              child: Text(
-                                "No channels found.",
-                                style: theme.textTheme.titleLarge?.copyWith(
-                                  color: Colors.white54,
+                          ? Focus(
+                              focusNode: _emptyStateFocusNode,
+                              onKeyEvent: (node, event) {
+                                if (event is KeyDownEvent &&
+                                    event.logicalKey ==
+                                        LogicalKeyboardKey.arrowLeft) {
+                                  _enterSidebar();
+                                  return KeyEventResult.handled;
+                                }
+                                return KeyEventResult.ignored;
+                              },
+                              child: Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.search_off_rounded,
+                                      size: 56,
+                                      color: Colors.white24,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      "No channels found in this category",
+                                      style: theme.textTheme.titleMedium
+                                          ?.copyWith(color: Colors.white54),
+                                    ),
+                                  ],
                                 ),
                               ),
                             )
@@ -378,28 +591,40 @@ class _MenuPageState extends State<MenuPage> {
                               gridDelegate:
                                   const SliverGridDelegateWithFixedCrossAxisCount(
                                     crossAxisCount: 4,
-                                    childAspectRatio: 16 / 9,
+                                    childAspectRatio: 16 / 9.5,
                                     crossAxisSpacing: 16,
                                     mainAxisSpacing: 16,
                                   ),
                               itemCount: displayed.length,
                               itemBuilder: (context, index) {
                                 final channel = displayed[index];
+                                final isLeftEdge = index % 4 == 0;
+                                final node = _getTileFocusNode(channel.id);
+
+                                final isAutofocus =
+                                    !_hasInitiallyAutofocused &&
+                                    (channel.id == currentChannel.id ||
+                                        (index == 0 &&
+                                            !displayed.any(
+                                              (c) => c.id == currentChannel.id,
+                                            )));
+
                                 return ChannelGridTile(
                                   key: ValueKey(channel.id),
                                   channel: channel,
+                                  focusNode: node,
                                   isFavorite: _isFavorite(channel),
                                   isPlaying: channel == currentChannel,
-                                  autofocus:
-                                      channel == currentChannel &&
-                                      _selectedCategoryIndex == 0,
+                                  autofocus: isAutofocus,
                                   onFocus: () {
                                     _focusedChannelNotifier.value = channel;
                                   },
+                                  onExitLeft: isLeftEdge ? _enterSidebar : null,
                                   onTap: () {
                                     widget.onChannelSelected(
                                       channel,
                                       displayed,
+                                      _selectedCategoryIndex,
                                     );
                                     setState(() {
                                       currentChannel = channel;
@@ -424,81 +649,17 @@ class _MenuPageState extends State<MenuPage> {
   }
 }
 
-class _SideMenuItem extends StatefulWidget {
-  final IconData icon;
-  final String label;
-  final bool isSelected;
-  final VoidCallback onFocus;
-
-  const _SideMenuItem({
-    required this.icon,
-    required this.label,
-    required this.isSelected,
-    required this.onFocus,
-  });
-
-  @override
-  State<_SideMenuItem> createState() => _SideMenuItemState();
-}
-
-class _SideMenuItemState extends State<_SideMenuItem> {
-  bool _isFocused = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final active = widget.isSelected || _isFocused;
-
-    return InkWell(
-      onFocusChange: (val) {
-        setState(() => _isFocused = val);
-        if (val) widget.onFocus();
-      },
-      onTap: widget.onFocus,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-        decoration: BoxDecoration(
-          color: active
-              ? theme.colorScheme.primaryContainer
-              : Colors.transparent,
-          border: Border(
-            left: BorderSide(
-              color: active ? theme.colorScheme.primary : Colors.transparent,
-              width: 4,
-            ),
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              widget.icon,
-              color: active
-                  ? theme.colorScheme.onPrimaryContainer
-                  : Colors.white60,
-            ),
-            const SizedBox(width: 16),
-            Text(
-              widget.label,
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: active
-                    ? theme.colorScheme.onPrimaryContainer
-                    : Colors.white60,
-                fontWeight: active ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
+// ---------------------------------------------------------------------------
+// CHANNEL GRID TILE
+// ---------------------------------------------------------------------------
 class ChannelGridTile extends StatefulWidget {
   final ChannelEntity channel;
+  final FocusNode focusNode;
   final bool isFavorite;
   final bool isPlaying;
   final bool autofocus;
   final VoidCallback onFocus;
+  final VoidCallback? onExitLeft;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
   final VoidCallback onToggleFavorite;
@@ -506,10 +667,12 @@ class ChannelGridTile extends StatefulWidget {
   const ChannelGridTile({
     super.key,
     required this.channel,
+    required this.focusNode,
     required this.isFavorite,
     required this.isPlaying,
     required this.autofocus,
     required this.onFocus,
+    this.onExitLeft,
     required this.onTap,
     required this.onLongPress,
     required this.onToggleFavorite,
@@ -521,7 +684,6 @@ class ChannelGridTile extends StatefulWidget {
 
 class _ChannelGridTileState extends State<ChannelGridTile> {
   bool _isFocused = false;
-  late final FocusNode _focusNode;
   Timer? _longPressTimer;
   bool _isSelectPressed = false;
   bool _isLongPressTriggered = false;
@@ -529,24 +691,45 @@ class _ChannelGridTileState extends State<ChannelGridTile> {
   @override
   void initState() {
     super.initState();
-    _focusNode = FocusNode();
-    _focusNode.addListener(() {
+    _isFocused = widget.focusNode.hasFocus;
+    widget.focusNode.addListener(_handleFocusChange);
+  }
+
+  @override
+  void didUpdateWidget(covariant ChannelGridTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusNode != widget.focusNode) {
+      oldWidget.focusNode.removeListener(_handleFocusChange);
+      widget.focusNode.addListener(_handleFocusChange);
+      _isFocused = widget.focusNode.hasFocus;
+    }
+  }
+
+  @override
+  void dispose() {
+    _cancelLongPress();
+    widget.focusNode.removeListener(_handleFocusChange);
+    super.dispose();
+  }
+
+  void _handleFocusChange() {
+    final hasFocus = widget.focusNode.hasFocus;
+    if (mounted && _isFocused != hasFocus) {
       setState(() {
-        _isFocused = _focusNode.hasFocus;
+        _isFocused = hasFocus;
       });
-      if (!_focusNode.hasFocus) {
-        _cancelLongPress();
-      }
-      if (_focusNode.hasFocus) {
-        widget.onFocus();
-        Scrollable.ensureVisible(
-          context,
-          alignment: 0.5,
-          duration: const Duration(milliseconds: 120),
-          curve: Curves.easeOutCubic,
-        );
-      }
-    });
+    }
+    if (!hasFocus) {
+      _cancelLongPress();
+    } else {
+      widget.onFocus();
+      Scrollable.ensureVisible(
+        context,
+        alignment: 0.5,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOutCubic,
+      );
+    }
   }
 
   void _cancelLongPress() {
@@ -554,13 +737,6 @@ class _ChannelGridTileState extends State<ChannelGridTile> {
     _longPressTimer = null;
     _isSelectPressed = false;
     _isLongPressTriggered = false;
-  }
-
-  @override
-  void dispose() {
-    _cancelLongPress();
-    _focusNode.dispose();
-    super.dispose();
   }
 
   bool _isSelectKey(LogicalKeyboardKey key) {
@@ -577,11 +753,16 @@ class _ChannelGridTileState extends State<ChannelGridTile> {
 
     return RepaintBoundary(
       child: Focus(
-        focusNode: _focusNode,
+        focusNode: widget.focusNode,
         autofocus: widget.autofocus,
         onKeyEvent: (node, event) {
           if (event is KeyDownEvent) {
-            if (event.logicalKey == LogicalKeyboardKey.keyF ||
+            // Left arrow on the leftmost column transitions focus into the sidebar
+            if (widget.onExitLeft != null &&
+                event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+              widget.onExitLeft!();
+              return KeyEventResult.handled;
+            } else if (event.logicalKey == LogicalKeyboardKey.keyF ||
                 event.logicalKey == LogicalKeyboardKey.asterisk) {
               widget.onToggleFavorite();
               return KeyEventResult.handled;
@@ -596,7 +777,7 @@ class _ChannelGridTileState extends State<ChannelGridTile> {
                 _isLongPressTriggered = false;
                 _longPressTimer?.cancel();
                 _longPressTimer = Timer(const Duration(milliseconds: 500), () {
-                  if (mounted && _focusNode.hasFocus) {
+                  if (mounted && widget.focusNode.hasFocus) {
                     _isLongPressTriggered = true;
                     HapticFeedback.mediumImpact();
                     widget.onLongPress();
@@ -614,7 +795,7 @@ class _ChannelGridTileState extends State<ChannelGridTile> {
               final timerWasActive = _longPressTimer?.isActive ?? false;
               _cancelLongPress();
               if (!_isLongPressTriggered && timerWasActive) {
-                _focusNode.requestFocus();
+                widget.focusNode.requestFocus();
                 widget.onTap();
               }
               return KeyEventResult.handled;
@@ -624,20 +805,20 @@ class _ChannelGridTileState extends State<ChannelGridTile> {
         },
         child: GestureDetector(
           onTap: () {
-            _focusNode.requestFocus();
+            widget.focusNode.requestFocus();
             widget.onTap();
           },
           onLongPress: () {
-            _focusNode.requestFocus();
+            widget.focusNode.requestFocus();
             HapticFeedback.mediumImpact();
             widget.onLongPress();
           },
           onSecondaryTap: () {
-            _focusNode.requestFocus();
+            widget.focusNode.requestFocus();
             widget.onLongPress();
           },
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
+            duration: const Duration(milliseconds: 180),
             curve: Curves.easeOutCubic,
             transform: Matrix4.diagonal3Values(
               _isFocused ? 1.05 : 1.0,
@@ -645,61 +826,77 @@ class _ChannelGridTileState extends State<ChannelGridTile> {
               1.0,
             ),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(12),
+              color: _isFocused
+                  ? const Color(0xFF222234)
+                  : const Color(0xFF161622),
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: _isFocused
                     ? Colors.white
                     : (widget.isPlaying
                           ? theme.colorScheme.primary
-                          : Colors.transparent),
-                width: _isFocused ? 3 : (widget.isPlaying ? 2 : 0),
+                          : Colors.white.withValues(alpha: 0.08)),
+                width: _isFocused ? 3 : (widget.isPlaying ? 2 : 1),
               ),
               boxShadow: _isFocused
                   ? [
                       BoxShadow(
-                        color: theme.colorScheme.primary.withValues(alpha: 0.6),
-                        blurRadius: 15,
+                        color: theme.colorScheme.primary.withValues(
+                          alpha: 0.55,
+                        ),
+                        blurRadius: 18,
                         spreadRadius: 2,
                       ),
                     ]
-                  : [],
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.3),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
             ),
             child: Stack(
               fit: StackFit.expand,
               children: [
                 // Logo Background
                 Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.all(18.0),
                   child: CachedNetworkImage(
                     imageUrl: widget.channel.image,
                     fit: BoxFit.contain,
                     memCacheWidth: 200,
                     fadeInDuration: const Duration(milliseconds: 150),
                     fadeOutDuration: const Duration(milliseconds: 100),
-                    placeholder: (context, url) =>
-                        const Icon(Icons.tv, size: 40, color: Colors.white24),
-                    errorWidget: (context, url, error) =>
-                        const Icon(Icons.tv, size: 40, color: Colors.white24),
+                    placeholder: (context, url) => const Icon(
+                      Icons.tv_rounded,
+                      size: 40,
+                      color: Colors.white24,
+                    ),
+                    errorWidget: (context, url, error) => const Icon(
+                      Icons.tv_rounded,
+                      size: 40,
+                      color: Colors.white24,
+                    ),
                   ),
                 ),
                 // Gradient Overlay for text
                 Container(
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(13),
                     gradient: const LinearGradient(
-                      colors: [Colors.black87, Colors.transparent],
+                      colors: [Color(0xEE0B0B12), Colors.transparent],
                       begin: Alignment.bottomCenter,
                       end: Alignment.topCenter,
-                      stops: [0.0, 0.4],
+                      stops: [0.0, 0.45],
                     ),
                   ),
                 ),
                 // Title & Favorite Icon
                 Positioned(
                   bottom: 8,
-                  left: 12,
-                  right: 12,
+                  left: 10,
+                  right: 10,
                   child: Row(
                     children: [
                       Expanded(
@@ -707,13 +904,18 @@ class _ChannelGridTileState extends State<ChannelGridTile> {
                           widget.channel.name,
                           style: const TextStyle(
                             color: Colors.white,
-                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
                             shadows: [
-                              Shadow(color: Colors.black, blurRadius: 2),
+                              Shadow(
+                                color: Colors.black,
+                                blurRadius: 4,
+                                offset: Offset(0, 1),
+                              ),
                             ],
                           ),
                           maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          overflow: TextOverflow.clip,
                         ),
                       ),
                       AnimatedSwitcher(
@@ -725,7 +927,7 @@ class _ChannelGridTileState extends State<ChannelGridTile> {
                                 key: ValueKey('fav_star'),
                                 padding: EdgeInsets.only(left: 4.0),
                                 child: Icon(
-                                  Icons.star,
+                                  Icons.star_rounded,
                                   color: Colors.amber,
                                   size: 16,
                                 ),
@@ -742,17 +944,45 @@ class _ChannelGridTileState extends State<ChannelGridTile> {
                     right: 8,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
+                        horizontal: 7,
+                        vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.primary,
-                        borderRadius: BorderRadius.circular(4),
+                        gradient: LinearGradient(
+                          colors: [
+                            theme.colorScheme.primary,
+                            theme.colorScheme.tertiary,
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(6),
+                        boxShadow: [
+                          BoxShadow(
+                            color: theme.colorScheme.primary.withValues(
+                              alpha: 0.4,
+                            ),
+                            blurRadius: 6,
+                            spreadRadius: 1,
+                          ),
+                        ],
                       ),
-                      child: const Icon(
-                        Icons.play_arrow,
-                        size: 14,
-                        color: Colors.white,
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.play_arrow_rounded,
+                            size: 12,
+                            color: Colors.white,
+                          ),
+                          SizedBox(width: 2),
+                          Text(
+                            "NOW",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),

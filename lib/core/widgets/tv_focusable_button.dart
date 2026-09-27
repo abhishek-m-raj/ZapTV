@@ -8,6 +8,14 @@ class TvFocusableButton extends StatefulWidget {
   final bool isFocused;
   final bool autofocus;
   final FocusNode? focusNode;
+  final Color? unfocusedBackgroundColor;
+  final Color? focusedBackgroundColor;
+  final Color? unfocusedTextColor;
+  final Color? focusedTextColor;
+  final Color? unfocusedBorderColor;
+  final Color? focusedBorderColor;
+  final EdgeInsetsGeometry? padding;
+  final double borderRadius;
 
   const TvFocusableButton({
     super.key,
@@ -18,6 +26,14 @@ class TvFocusableButton extends StatefulWidget {
     this.isFocused = false,
     this.autofocus = false,
     this.focusNode,
+    this.unfocusedBackgroundColor,
+    this.focusedBackgroundColor,
+    this.unfocusedTextColor,
+    this.focusedTextColor,
+    this.unfocusedBorderColor,
+    this.focusedBorderColor,
+    this.padding,
+    this.borderRadius = 10,
   });
 
   @override
@@ -29,8 +45,38 @@ class _TvFocusableButtonState extends State<TvFocusableButton> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final hasFocus = _isFocused || widget.isFocused;
+
+    Color bg;
+    Color border;
+    Color fg;
+
+    if (widget.isJioLoggedIn) {
+      if (hasFocus) {
+        bg = widget.focusedBackgroundColor ?? Colors.green.shade600;
+        border = widget.focusedBorderColor ?? Colors.white;
+        fg = widget.focusedTextColor ?? Colors.white;
+      } else {
+        bg =
+            widget.unfocusedBackgroundColor ??
+            Colors.green.shade900.withValues(alpha: 0.5);
+        border =
+            widget.unfocusedBorderColor ??
+            Colors.green.shade400.withValues(alpha: 0.4);
+        fg = widget.unfocusedTextColor ?? Colors.green.shade200;
+      }
+    } else {
+      if (hasFocus) {
+        bg = widget.focusedBackgroundColor ?? Colors.white;
+        border = widget.focusedBorderColor ?? Colors.white;
+        fg = widget.focusedTextColor ?? const Color(0xFF101114);
+      } else {
+        bg = widget.unfocusedBackgroundColor ?? const Color(0xFF20232E);
+        border =
+            widget.unfocusedBorderColor ?? Colors.white.withValues(alpha: 0.12);
+        fg = widget.unfocusedTextColor ?? Colors.white;
+      }
+    }
 
     return InkWell(
       focusNode: widget.focusNode,
@@ -41,58 +87,51 @@ class _TvFocusableButtonState extends State<TvFocusableButton> {
           _isFocused = focusValue;
         });
       },
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(widget.borderRadius),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        curve: Curves.easeOutCubic,
+        transform: Matrix4.diagonal3Values(
+          hasFocus ? 1.02 : 1.0,
+          hasFocus ? 1.02 : 1.0,
+          1.0,
+        ),
+        padding:
+            widget.padding ??
+            const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
         decoration: BoxDecoration(
-          color: hasFocus
-              ? theme.colorScheme.primary
-              : (widget.isJioLoggedIn
-                    ? Colors.green.shade800
-                    : theme.colorScheme.surfaceContainerHighest.withValues(
-                        alpha: 0.15,
-                      )),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: hasFocus ? Colors.white : Colors.transparent,
-            width: 2.5,
-          ),
+          color: bg,
+          borderRadius: BorderRadius.circular(widget.borderRadius),
+          border: Border.all(color: border, width: hasFocus ? 2.0 : 1.0),
           boxShadow: hasFocus
               ? [
                   BoxShadow(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.4),
-                    blurRadius: 8,
-                    spreadRadius: 2,
+                    color: widget.isJioLoggedIn
+                        ? Colors.green.withValues(alpha: 0.35)
+                        : Colors.white.withValues(alpha: 0.2),
+                    blurRadius: 10,
+                    spreadRadius: 1,
                   ),
                 ]
               : [],
         ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (widget.icon != null) ...[
               IconTheme(
-                data: IconThemeData(
-                  color: hasFocus
-                      ? Colors.white
-                      : (widget.isJioLoggedIn
-                            ? Colors.white
-                            : theme.colorScheme.onSurface),
-                ),
+                data: IconThemeData(color: fg, size: 20),
                 child: widget.icon!,
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
             ],
             DefaultTextStyle(
               style: TextStyle(
-                color: hasFocus
-                    ? Colors.white
-                    : (widget.isJioLoggedIn
-                          ? Colors.white
-                          : theme.colorScheme.onSurface),
+                color: fg,
                 fontWeight: FontWeight.bold,
-                fontSize: 16,
+                fontSize: 15,
+                letterSpacing: 0.2,
               ),
               child: widget.label,
             ),

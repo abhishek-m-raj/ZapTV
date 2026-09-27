@@ -74,15 +74,18 @@ class _MyHomePageState extends State<HomePage> {
     final bool isKeyUp = event is KeyUpEvent;
     if (isKeyUp) return false;
     if (isMenuOpened) return false;
-    if (key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.arrowRight) {
+    if (key == LogicalKeyboardKey.arrowUp ||
+        key == LogicalKeyboardKey.arrowRight) {
       bloc.add(HomeNextChannelEvent());
       showChannelInfo();
       return true;
-    } else if (key == LogicalKeyboardKey.arrowDown || key == LogicalKeyboardKey.arrowLeft) {
+    } else if (key == LogicalKeyboardKey.arrowDown ||
+        key == LogicalKeyboardKey.arrowLeft) {
       bloc.add(HomePreviousChannelEvent());
       showChannelInfo();
       return true;
-    } else if (key == LogicalKeyboardKey.info || key == LogicalKeyboardKey.keyI) {
+    } else if (key == LogicalKeyboardKey.info ||
+        key == LogicalKeyboardKey.keyI) {
       showChannelInfo();
       return true;
     } else if (key == LogicalKeyboardKey.select ||
@@ -107,9 +110,21 @@ class _MyHomePageState extends State<HomePage> {
         builder: (context) => MenuPage(
           currentChannel: bloc.currentState.currentChannel,
           channels: bloc.currentState.allChannels,
-          onChannelSelected: (ChannelEntity channel, List<ChannelEntity> activePlaylist) {
-            bloc.add(HomeSelectChannelEvent(channel, activePlaylist: activePlaylist));
-          },
+          initialCategoryIndex: bloc.currentState.categoryIndex,
+          onChannelSelected:
+              (
+                ChannelEntity channel,
+                List<ChannelEntity> activePlaylist,
+                int categoryIndex,
+              ) {
+                bloc.add(
+                  HomeSelectChannelEvent(
+                    channel,
+                    activePlaylist: activePlaylist,
+                    categoryIndex: categoryIndex,
+                  ),
+                );
+              },
           onJioLoginSuccess: () {
             bloc.add(HomeInitialEvent());
           },

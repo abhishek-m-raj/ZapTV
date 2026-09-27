@@ -37,7 +37,9 @@ class JiotvGoProcessService {
       talker.info('[JioTV FFI] Starting JioTV-Go server with dataDir=$dataDir');
       final result = _ffi.startServer(port: '5050', dataDir: dataDir);
       if (result == 0) {
-        talker.info('[JioTV FFI] Server started successfully, waiting for it to become ready...');
+        talker.info(
+          '[JioTV FFI] Server started successfully, waiting for it to become ready...',
+        );
         await _waitForServerReady();
       } else {
         final err = _ffi.getLastError();
@@ -116,17 +118,21 @@ class JiotvGoProcessService {
     final formatted = _formatMobile(mobileNumber);
     talker.info('[ProcessService] Sending OTP to $formatted');
 
-    // Bypass FFI because modifying credentials via FFI doesn't update the 
+    // Bypass FFI because modifying credentials via FFI doesn't update the
     // running HTTP server's memory. Hit the HTTP server directly.
     final url = '$baseUrl/login/sendOTP';
     talker.info('[ProcessService] Trying HTTP fallback: $url');
     try {
-      final res = await http.post(
-        Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'mobile': formatted}),
-      ).timeout(const Duration(seconds: 5));
-      talker.info('[ProcessService] HTTP response code: ${res.statusCode}, body: ${res.body}');
+      final res = await http
+          .post(
+            Uri.parse(url),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'mobile': formatted}),
+          )
+          .timeout(const Duration(seconds: 5));
+      talker.info(
+        '[ProcessService] HTTP response code: ${res.statusCode}, body: ${res.body}',
+      );
       if (res.statusCode == 200) {
         talker.info('[ProcessService] OTP sent successfully via HTTP fallback');
         return {'success': true, 'message': 'OTP sent successfully'};
@@ -142,23 +148,33 @@ class JiotvGoProcessService {
   }
 
   Future<Map<String, dynamic>> verifyOtp(
-      String mobileNumber, String otp) async {
+    String mobileNumber,
+    String otp,
+  ) async {
     final formatted = _formatMobile(mobileNumber);
-    talker.info('[ProcessService] Verifying OTP for $formatted (OTP length: ${otp.length})');
+    talker.info(
+      '[ProcessService] Verifying OTP for $formatted (OTP length: ${otp.length})',
+    );
 
-    // Bypass FFI because modifying credentials via FFI doesn't update the 
+    // Bypass FFI because modifying credentials via FFI doesn't update the
     // running HTTP server's memory. Hit the HTTP server directly.
     final url = '$baseUrl/login/verifyOTP';
     talker.info('[ProcessService] Trying HTTP fallback: $url');
     try {
-      final res = await http.post(
-        Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'mobile': formatted, 'otp': otp}),
-      ).timeout(const Duration(seconds: 5));
-      talker.info('[ProcessService] HTTP response code: ${res.statusCode}, body: ${res.body}');
+      final res = await http
+          .post(
+            Uri.parse(url),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'mobile': formatted, 'otp': otp}),
+          )
+          .timeout(const Duration(seconds: 5));
+      talker.info(
+        '[ProcessService] HTTP response code: ${res.statusCode}, body: ${res.body}',
+      );
       if (res.statusCode == 200) {
-        talker.info('[ProcessService] OTP verified successfully via HTTP fallback');
+        talker.info(
+          '[ProcessService] OTP verified successfully via HTTP fallback',
+        );
         return {'success': true, 'message': 'OTP verified successfully'};
       }
     } catch (e, st) {
@@ -169,6 +185,33 @@ class JiotvGoProcessService {
       'success': false,
       'message': 'Failed to verify OTP. Please check the code.',
     };
+  }
+
+  /// Clears stored JioTV credentials and restarts server without credentials.
+  Future<void> logout() async {
+    talker.info('[ProcessService] Logging out and clearing JioTV data...');
+    try {
+      final dirPath = await _getDataDir();
+      final dir = Directory(dirPath);
+      if (await dir.exists()) {
+        final entries = dir.listSync();
+        for (final entry in entries) {
+          try {
+            await entry.delete(recursive: true);
+          } catch (e) {
+            talker.warning(
+              '[ProcessService] Failed to delete ${entry.path}: $e',
+            );
+          }
+        }
+      }
+      await restartServer();
+      talker.info(
+        '[ProcessService] Successfully logged out and restarted server',
+      );
+    } catch (e, st) {
+      talker.error('[ProcessService] Logout error', e, st);
+    }
   }
 
   /// Restart the server so it reloads credentials from disk.
@@ -190,7 +233,9 @@ class JiotvGoProcessService {
     }
 
     if (!stopped) {
-      talker.warning('[JioTV FFI] Server did not stop within 5s, forcing restart...');
+      talker.warning(
+        '[JioTV FFI] Server did not stop within 5s, forcing restart...',
+      );
     }
 
     _isStarting = false; // Reset the guard so initAndStart() can proceed
