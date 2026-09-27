@@ -23,3 +23,15 @@ class HomeSelectChannelEvent extends HomeEvent {
     this.categoryIndex,
   });
 }
+
+class HomeChannelErrorEvent extends HomeEvent {
+  final String channelId;
+  final bool isPremium;
+  final String message;
+
+  HomeChannelErrorEvent({
+    required this.channelId,
+    required this.isPremium,
+    required this.message,
+  });
+}

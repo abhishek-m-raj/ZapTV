@@ -15,6 +15,8 @@ class ZapVideoController extends ChangeNotifier {
   VideoPlayerController? _vpController;
   BetterPlayerController? _bpController;
 
+  void Function(String error)? onPlaybackError;
+
   bool get isDesktop =>
       !kIsWeb && (Platform.isLinux || Platform.isWindows || Platform.isMacOS);
 
@@ -37,20 +39,31 @@ class ZapVideoController extends ChangeNotifier {
       );
       _mkPlayer?.stream.error.listen((err) {
         talker.error('MediaKit Video Error: $err');
+        onPlaybackError?.call(err.toString());
       });
       _mkPlayer?.stream.log.listen((log) {
         talker.debug('MediaKit Log: ${log.text}');
+        if (log.text.contains('500') ||
+            log.text.toLowerCase().contains('server returned 500')) {
+          onPlaybackError?.call(log.text);
+        }
       });
     }
   }
 
-  Future<void> open(String url, {String? licenseType, String? licenseKey}) async {
+  Future<void> open(
+    String url, {
+    String? licenseType,
+    String? licenseKey,
+  }) async {
     if (!url.startsWith('http')) {
       talker.warning('Invalid video stream URL ignored: $url');
       return;
     }
 
-    talker.info('Opening video stream [$engineName]: $url (License Key: $licenseKey)');
+    talker.info(
+      'Opening video stream [$engineName]: $url (License Key: $licenseKey)',
+    );
 
     if (isDesktop) {
       try {
@@ -58,6 +71,7 @@ class ZapVideoController extends ChangeNotifier {
         talker.info('MediaKit video stream command sent successfully');
       } catch (e, st) {
         talker.handle(e, st, 'Failed to open video stream in MediaKit');
+        onPlaybackError?.call(e.toString());
       }
     } else if (isAndroid) {
       final oldController = _bpController;
@@ -95,12 +109,21 @@ class ZapVideoController extends ChangeNotifier {
         betterPlayerDataSource: dataSource,
       );
 
+      _bpController?.addEventsListener((BetterPlayerEvent event) {
+        if (event.betterPlayerEventType == BetterPlayerEventType.exception) {
+          final errStr = event.parameters?.toString() ?? '';
+          talker.error('BetterPlayer exception: $errStr');
+          onPlaybackError?.call(errStr);
+        }
+      });
+
       notifyListeners();
 
       try {
         talker.info('BetterPlayer android stream initialized');
       } catch (e, st) {
         talker.handle(e, st, 'Failed to initialize better_player_plus');
+        onPlaybackError?.call(e.toString());
       }
 
       if (oldController != null) {
@@ -110,6 +133,13 @@ class ZapVideoController extends ChangeNotifier {
     } else {
       final oldController = _vpController;
       _vpController = VideoPlayerController.networkUrl(Uri.parse(url));
+      _vpController?.addListener(() {
+        if (_vpController != null && _vpController!.value.hasError) {
+          final errStr = _vpController!.value.errorDescription ?? '';
+          talker.error('VideoPlayer mobile error: $errStr');
+          onPlaybackError?.call(errStr);
+        }
+      });
       notifyListeners();
 
       try {
@@ -119,11 +149,30 @@ class ZapVideoController extends ChangeNotifier {
         talker.info('VideoPlayer mobile stream initialized and playing');
       } catch (e, st) {
         talker.handle(e, st, 'Failed to initialize mobile VideoPlayer');
+        onPlaybackError?.call(e.toString());
       }
 
       await oldController?.dispose();
       notifyListeners();
     }
+  }
+
+  Future<void> stop() async {
+    talker.info('Stopping video stream [$engineName]');
+    if (isDesktop) {
+      try {
+        await _mkPlayer?.stop();
+      } catch (_) {}
+    } else if (isAndroid) {
+      try {
+        await _bpController?.pause();
+      } catch (_) {}
+    } else {
+      try {
+        await _vpController?.pause();
+      } catch (_) {}
+    }
+    notifyListeners();
   }
 
   String get engineName {

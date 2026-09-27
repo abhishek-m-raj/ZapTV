@@ -12,6 +12,8 @@ class HomeLoadedState extends HomeState {
   final List<ChannelEntity> allChannels;
   final bool showChannelInfo;
   final int categoryIndex;
+  final bool isPremiumError;
+  final String? errorMessage;
 
   HomeLoadedState({
     required this.currentChannel,
@@ -19,6 +21,8 @@ class HomeLoadedState extends HomeState {
     required this.allChannels,
     this.showChannelInfo = false,
     this.categoryIndex = 0,
+    this.isPremiumError = false,
+    this.errorMessage,
   });
 
   HomeLoadedState copyWith({
@@ -27,6 +31,8 @@ class HomeLoadedState extends HomeState {
     List<ChannelEntity>? allChannels,
     bool? showChannelInfo,
     int? categoryIndex,
+    bool? isPremiumError,
+    String? errorMessage,
   }) {
     return HomeLoadedState(
       currentChannel: currentChannel ?? this.currentChannel,
@@ -34,6 +40,8 @@ class HomeLoadedState extends HomeState {
       allChannels: allChannels ?? this.allChannels,
       showChannelInfo: showChannelInfo ?? this.showChannelInfo,
       categoryIndex: categoryIndex ?? this.categoryIndex,
+      isPremiumError: isPremiumError ?? this.isPremiumError,
+      errorMessage: errorMessage ?? this.errorMessage,
     );
   }
 }

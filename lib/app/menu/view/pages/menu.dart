@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:zaptv/app/home/domain/entities/channel.dart';
 import 'package:zaptv/app/menu/view/widgets/channel_options_dialog.dart';
-import 'package:zaptv/app/menu/view/widgets/collapsible_sidebar.dart';
+import 'package:zaptv/app/menu/view/widgets/sidebar.dart';
 import 'package:zaptv/app/settings/view/pages/settings_page.dart';
 import 'package:zaptv/core/config/locator.dart';
 import 'package:zaptv/core/services/hive_db.dart';
@@ -19,8 +19,7 @@ class MenuPage extends StatefulWidget {
     ChannelEntity channel,
     List<ChannelEntity> playlist,
     int categoryIndex,
-  )
-  onChannelSelected;
+  ) onChannelSelected;
   final VoidCallback onPop;
   final VoidCallback? onJioLoginSuccess;
 
@@ -39,9 +38,6 @@ class MenuPage extends StatefulWidget {
 }
 
 class _MenuPageState extends State<MenuPage> {
-  final GlobalKey<CollapsibleSidebarState> _sidebarKey =
-      GlobalKey<CollapsibleSidebarState>();
-
   late ChannelEntity currentChannel;
   late int _selectedCategoryIndex; // 0: All, 1: Favorites, 2: JioTV, 3: IPTV
   final HiveDb _hiveDb = loc<HiveDb>();
@@ -54,12 +50,11 @@ class _MenuPageState extends State<MenuPage> {
 
   late final ValueNotifier<ChannelEntity?> _focusedChannelNotifier;
 
-  // Managed FocusNodes for Grid channel tiles to guarantee focus restoration
-  final Map<String, FocusNode> _tileFocusNodes = {};
-  late final FocusNode _emptyStateFocusNode;
+  // Scroll controller to safely reset/manage grid viewport
+  final ScrollController _scrollController = ScrollController();
 
-  bool _isSidebarOpen = false;
-  bool _hasInitiallyAutofocused = false;
+  // Managed FocusNodes for Grid channel tiles
+  final Map<String, FocusNode> _tileFocusNodes = {};
 
   @override
   void initState() {
@@ -68,38 +63,27 @@ class _MenuPageState extends State<MenuPage> {
     _selectedCategoryIndex = widget.initialCategoryIndex;
 
     _allChannels = widget.channels;
-    _jioChannels = widget.channels
-        .where((c) => c.id.endsWith('-jiotv'))
-        .toList();
-    _iptvChannels = widget.channels
-        .where((c) => !c.id.endsWith('-jiotv'))
-        .toList();
+    _jioChannels =
+        widget.channels.where((c) => c.id.endsWith('-jiotv')).toList();
+    _iptvChannels =
+        widget.channels.where((c) => !c.id.endsWith('-jiotv')).toList();
     _updateDisplayedChannels();
 
-    final hasCurrent = _displayedChannels.any((c) => c.id == currentChannel.id);
+    final hasCurrent =
+        _displayedChannels.any((c) => c.id == currentChannel.id);
     _focusedChannelNotifier = ValueNotifier<ChannelEntity?>(
       hasCurrent
           ? currentChannel
           : (_displayedChannels.isNotEmpty
-                ? _displayedChannels.first
-                : currentChannel),
+              ? _displayedChannels.first
+              : currentChannel),
     );
-
-    _emptyStateFocusNode = FocusNode(debugLabel: 'GridEmptyState');
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        setState(() {
-          _hasInitiallyAutofocused = true;
-        });
-      }
-    });
   }
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _focusedChannelNotifier.dispose();
-    _emptyStateFocusNode.dispose();
     for (final node in _tileFocusNodes.values) {
       node.dispose();
     }
@@ -116,9 +100,8 @@ class _MenuPageState extends State<MenuPage> {
 
   void _updateDisplayedChannels() {
     if (_selectedCategoryIndex == 1) {
-      _displayedChannels = widget.channels
-          .where((c) => _isFavorite(c))
-          .toList();
+      _displayedChannels =
+          widget.channels.where((c) => _isFavorite(c)).toList();
     } else if (_selectedCategoryIndex == 2) {
       _displayedChannels = _jioChannels;
     } else if (_selectedCategoryIndex == 3) {
@@ -144,13 +127,10 @@ class _MenuPageState extends State<MenuPage> {
       if (_selectedCategoryIndex == 1 &&
           isFav &&
           _focusedChannelNotifier.value == channel) {
-        _focusedChannelNotifier.value = _displayedChannels.isNotEmpty
-            ? _displayedChannels.first
-            : null;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _focusCurrentOrFirstChannel();
-        });
+        _focusedChannelNotifier.value =
+            _displayedChannels.isNotEmpty ? _displayedChannels.first : null;
       } else if (_focusedChannelNotifier.value == channel) {
+        // Trigger ValueNotifier update to refresh favorite star in header
         _focusedChannelNotifier.value = null;
         _focusedChannelNotifier.value = channel;
       }
@@ -191,68 +171,13 @@ class _MenuPageState extends State<MenuPage> {
     });
   }
 
-  /// Transfer focus from Grid into Sidebar
-  void _enterSidebar() {
-    _sidebarKey.currentState?.focusActiveCategory();
-  }
-
-  /// Transfer focus from Sidebar back to Grid
-  void _exitSidebarToGrid({int? newCategoryIndex}) {
-    if (newCategoryIndex != null &&
-        newCategoryIndex != _selectedCategoryIndex) {
-      _onCategorySelect(newCategoryIndex);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        _focusCurrentOrFirstChannel();
-      });
-    } else {
-      _focusCurrentOrFirstChannel();
-    }
-  }
-
-  /// Focus either the currently active channel or first channel in the grid
-  void _focusCurrentOrFirstChannel() {
-    if (_displayedChannels.isEmpty) {
-      _emptyStateFocusNode.requestFocus();
-      return;
-    }
-
-    final active = _focusedChannelNotifier.value ?? currentChannel;
-    final target = _displayedChannels.any((c) => c.id == active.id)
-        ? active
-        : _displayedChannels.first;
-
-    final targetNode = _getTileFocusNode(target.id);
-    if (targetNode.canRequestFocus && targetNode.context != null) {
-      targetNode.requestFocus();
-      _focusedChannelNotifier.value = target;
-    } else {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        if (targetNode.canRequestFocus && targetNode.context != null) {
-          targetNode.requestFocus();
-          _focusedChannelNotifier.value = target;
-        } else {
-          final first = _displayedChannels.first;
-          final firstNode = _getTileFocusNode(first.id);
-          firstNode.requestFocus();
-          _focusedChannelNotifier.value = first;
-        }
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final displayed = _displayedChannels;
 
     return PopScope(
-      canPop: !_isSidebarOpen,
       onPopInvokedWithResult: (didPop, result) {
-        if (!didPop && _isSidebarOpen) {
-          // If Back pressed while inside the sidebar, safely return to grid
-          _exitSidebarToGrid();
-        } else if (didPop) {
+        if (didPop) {
           widget.onPop();
         }
       },
@@ -260,22 +185,10 @@ class _MenuPageState extends State<MenuPage> {
         backgroundColor: AppColors.black,
         body: Row(
           children: [
-            // COLLAPSIBLE SIDEBAR
-            CollapsibleSidebar(
-              key: _sidebarKey,
+            // SIDEBAR
+            Sidebar(
               selectedCategoryIndex: _selectedCategoryIndex,
-              onExpansionChanged: (open) {
-                if (_isSidebarOpen != open) {
-                  setState(() => _isSidebarOpen = open);
-                }
-              },
               onCategorySelected: _onCategorySelect,
-              onExitRightFromCategory: (catIndex) {
-                _exitSidebarToGrid(newCategoryIndex: catIndex);
-              },
-              onExitRightFromAction: () {
-                _exitSidebarToGrid();
-              },
               onSettingsPressed: () async {
                 await Navigator.push(
                   context,
@@ -294,7 +207,7 @@ class _MenuPageState extends State<MenuPage> {
             Expanded(
               child: Column(
                 children: [
-                  // TOP CHANNEL PREVIEW HEADER - SOLID DARK SURFACE
+                  // TOP CHANNEL PREVIEW HEADER
                   ValueListenableBuilder<ChannelEntity?>(
                     valueListenable: _focusedChannelNotifier,
                     builder: (context, activeChannel, child) {
@@ -347,7 +260,8 @@ class _MenuPageState extends State<MenuPage> {
                                         ),
                                         decoration: BoxDecoration(
                                           color: const Color(0xFF10121A),
-                                          borderRadius: BorderRadius.circular(4),
+                                          borderRadius:
+                                              BorderRadius.circular(4),
                                           border: Border.all(
                                             color: const Color(0xFF1E212D),
                                             width: 1,
@@ -374,7 +288,8 @@ class _MenuPageState extends State<MenuPage> {
                                           ],
                                         ),
                                       ),
-                                      if (activeChannel.group.isNotEmpty) ...[
+                                      if (activeChannel
+                                          .group.isNotEmpty) ...[
                                         const SizedBox(width: 10),
                                         Container(
                                           padding: const EdgeInsets.symmetric(
@@ -383,7 +298,8 @@ class _MenuPageState extends State<MenuPage> {
                                           ),
                                           decoration: BoxDecoration(
                                             color: const Color(0xFF10121A),
-                                            borderRadius: BorderRadius.circular(4),
+                                            borderRadius:
+                                                BorderRadius.circular(4),
                                             border: Border.all(
                                               color: const Color(0xFF1E212D),
                                               width: 1,
@@ -408,7 +324,8 @@ class _MenuPageState extends State<MenuPage> {
                                           ),
                                           decoration: BoxDecoration(
                                             color: const Color(0xFF10121A),
-                                            borderRadius: BorderRadius.circular(4),
+                                            borderRadius:
+                                                BorderRadius.circular(4),
                                             border: Border.all(
                                               color: const Color(0xFF1E212D),
                                               width: 1,
@@ -455,7 +372,8 @@ class _MenuPageState extends State<MenuPage> {
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.5),
+                                    color:
+                                        Colors.black.withValues(alpha: 0.5),
                                     blurRadius: 16,
                                     spreadRadius: 2,
                                     offset: const Offset(0, 4),
@@ -474,17 +392,19 @@ class _MenuPageState extends State<MenuPage> {
                                       fadeInDuration: const Duration(
                                         milliseconds: 150,
                                       ),
-                                      placeholder: (context, url) => const Icon(
+                                      placeholder: (context, url) =>
+                                          const Icon(
                                         Icons.tv_rounded,
                                         size: 60,
                                         color: AppColors.claySoil,
                                       ),
-                                      errorWidget: (context, url, error) =>
-                                          const Icon(
-                                            Icons.tv_rounded,
-                                            size: 60,
-                                            color: AppColors.claySoil,
-                                          ),
+                                      errorWidget:
+                                          (context, url, error) =>
+                                              const Icon(
+                                        Icons.tv_rounded,
+                                        size: 60,
+                                        color: AppColors.claySoil,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -501,64 +421,51 @@ class _MenuPageState extends State<MenuPage> {
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24.0),
                       child: displayed.isEmpty
-                          ? Focus(
-                              focusNode: _emptyStateFocusNode,
-                              onKeyEvent: (node, event) {
-                                if (event is KeyDownEvent &&
-                                    event.logicalKey ==
-                                        LogicalKeyboardKey.arrowLeft) {
-                                  _enterSidebar();
-                                  return KeyEventResult.handled;
-                                }
-                                return KeyEventResult.ignored;
-                              },
-                              child: Center(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.search_off_rounded,
-                                      size: 56,
-                                      color: AppColors.claySoil.withValues(
-                                        alpha: 0.5,
-                                      ),
+                          ? Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.search_off_rounded,
+                                    size: 56,
+                                    color: AppColors.claySoil
+                                        .withValues(alpha: 0.5),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  const Text(
+                                    "No channels found in this category",
+                                    style: TextStyle(
+                                      color: AppColors.lightBronze,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
                                     ),
-                                    const SizedBox(height: 12),
-                                    const Text(
-                                      "No channels found in this category",
-                                      style: TextStyle(
-                                        color: AppColors.lightBronze,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
                             )
                           : GridView.builder(
+                              controller: _scrollController,
                               // ignore: deprecated_member_use
                               cacheExtent: 800.0,
                               gridDelegate:
                                   const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 4,
-                                    childAspectRatio: 16 / 9.5,
-                                    crossAxisSpacing: 16,
-                                    mainAxisSpacing: 16,
-                                  ),
+                                crossAxisCount: 4,
+                                childAspectRatio: 16 / 9.5,
+                                crossAxisSpacing: 16,
+                                mainAxisSpacing: 16,
+                              ),
                               itemCount: displayed.length,
                               itemBuilder: (context, index) {
                                 final channel = displayed[index];
-                                final isLeftEdge = index % 4 == 0;
                                 final node = _getTileFocusNode(channel.id);
 
                                 final isAutofocus =
-                                    !_hasInitiallyAutofocused &&
-                                    (channel.id == currentChannel.id ||
+                                    channel.id == currentChannel.id ||
                                         (index == 0 &&
                                             !displayed.any(
-                                              (c) => c.id == currentChannel.id,
-                                            )));
+                                              (c) =>
+                                                  c.id == currentChannel.id,
+                                            ));
 
                                 return ChannelGridTile(
                                   key: ValueKey(channel.id),
@@ -570,7 +477,6 @@ class _MenuPageState extends State<MenuPage> {
                                   onFocus: () {
                                     _focusedChannelNotifier.value = channel;
                                   },
-                                  onExitLeft: isLeftEdge ? _enterSidebar : null,
                                   onTap: () {
                                     widget.onChannelSelected(
                                       channel,
@@ -610,7 +516,6 @@ class ChannelGridTile extends StatefulWidget {
   final bool isPlaying;
   final bool autofocus;
   final VoidCallback onFocus;
-  final VoidCallback? onExitLeft;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
   final VoidCallback onToggleFavorite;
@@ -623,7 +528,6 @@ class ChannelGridTile extends StatefulWidget {
     required this.isPlaying,
     required this.autofocus,
     required this.onFocus,
-    this.onExitLeft,
     required this.onTap,
     required this.onLongPress,
     required this.onToggleFavorite,
@@ -706,12 +610,7 @@ class _ChannelGridTileState extends State<ChannelGridTile> {
         autofocus: widget.autofocus,
         onKeyEvent: (node, event) {
           if (event is KeyDownEvent) {
-            // Left arrow on the leftmost column transitions focus into the sidebar
-            if (widget.onExitLeft != null &&
-                event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-              widget.onExitLeft!();
-              return KeyEventResult.handled;
-            } else if (event.logicalKey == LogicalKeyboardKey.keyF ||
+            if (event.logicalKey == LogicalKeyboardKey.keyF ||
                 event.logicalKey == LogicalKeyboardKey.asterisk) {
               widget.onToggleFavorite();
               return KeyEventResult.handled;
@@ -725,7 +624,8 @@ class _ChannelGridTileState extends State<ChannelGridTile> {
                 _isSelectPressed = true;
                 _isLongPressTriggered = false;
                 _longPressTimer?.cancel();
-                _longPressTimer = Timer(const Duration(milliseconds: 500), () {
+                _longPressTimer =
+                    Timer(const Duration(milliseconds: 500), () {
                   if (mounted && widget.focusNode.hasFocus) {
                     _isLongPressTriggered = true;
                     HapticFeedback.mediumImpact();
@@ -783,14 +683,15 @@ class _ChannelGridTileState extends State<ChannelGridTile> {
                 color: _isFocused
                     ? AppColors.lightBronze
                     : (widget.isPlaying
-                          ? AppColors.lightBronze
-                          : const Color(0xFF1A1C26)),
+                        ? AppColors.lightBronze
+                        : const Color(0xFF1A1C26)),
                 width: _isFocused ? 2.5 : (widget.isPlaying ? 2 : 1),
               ),
               boxShadow: _isFocused
                   ? [
                       BoxShadow(
-                        color: AppColors.lightBronze.withValues(alpha: 0.35),
+                        color:
+                            AppColors.lightBronze.withValues(alpha: 0.35),
                         blurRadius: 16,
                         spreadRadius: 1,
                       ),
@@ -882,7 +783,8 @@ class _ChannelGridTileState extends State<ChannelGridTile> {
                                   size: 16,
                                 ),
                               )
-                            : const SizedBox.shrink(key: ValueKey("no_fav")),
+                            : const SizedBox.shrink(
+                                key: ValueKey("no_fav")),
                       ),
                     ],
                   ),

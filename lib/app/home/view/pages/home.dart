@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:zaptv/app/home/domain/entities/channel.dart';
 import 'package:zaptv/app/home/view/bloc/home_bloc.dart';
 import 'package:zaptv/app/home/view/widgets/channel_info.dart';
+import 'package:zaptv/app/home/view/widgets/premium_channel_overlay.dart';
 import 'package:zaptv/app/menu/view/pages/menu.dart';
 import 'package:zaptv/core/config/locator.dart';
 import 'package:zaptv/core/services/zap_video_controller.dart';
@@ -61,7 +62,7 @@ class _MyHomePageState extends State<HomePage> {
   void showChannelInfo() {
     channelInfoTimer?.cancel();
     bloc.add(HomeShowChannelInfoEvent());
-    channelInfoTimer = Timer(Duration(seconds: 5), () async {
+    channelInfoTimer = Timer(const Duration(seconds: 5), () async {
       bloc.add(HomeShowChannelInfoEvent(false));
     });
   }
@@ -164,8 +165,16 @@ class _MyHomePageState extends State<HomePage> {
                   controller: bloc.videoController,
                   fit: BoxFit.contain,
                 ),
+                if (state is HomeLoadedState && state.isPremiumError)
+                  PremiumChannelOverlay(
+                    channel: state.currentChannel,
+                    onOpenMenu: openMenu,
+                  ),
                 if (state is HomeLoadedState && state.showChannelInfo)
-                  ChannelInfo(currentChannel: state.currentChannel),
+                  ChannelInfo(
+                    currentChannel: state.currentChannel,
+                    isPremiumError: state.isPremiumError,
+                  ),
               ],
             ),
           );

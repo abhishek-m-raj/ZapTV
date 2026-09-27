@@ -5,8 +5,13 @@ import 'package:zaptv/core/theme/app_theme.dart';
 
 class ChannelInfo extends StatelessWidget {
   final ChannelEntity currentChannel;
+  final bool isPremiumError;
 
-  const ChannelInfo({super.key, required this.currentChannel});
+  const ChannelInfo({
+    super.key,
+    required this.currentChannel,
+    this.isPremiumError = false,
+  });
 
   String _formatTime(DateTime time) {
     int hour = time.hour;
@@ -59,15 +64,42 @@ class ChannelInfo extends StatelessWidget {
                   ),
                 ],
               ),
-              child: CachedNetworkImage(
-                imageUrl: currentChannel.image,
-                fit: BoxFit.contain,
-                memCacheWidth: 200,
-                fadeInDuration: const Duration(milliseconds: 150),
-                placeholder: (context, url) =>
-                    const Icon(Icons.tv, size: 40, color: Colors.grey),
-                errorWidget: (context, url, error) =>
-                    const Icon(Icons.tv, size: 40, color: Colors.grey),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: CachedNetworkImage(
+                      imageUrl: currentChannel.image,
+                      fit: BoxFit.contain,
+                      memCacheWidth: 200,
+                      fadeInDuration: const Duration(milliseconds: 150),
+                      placeholder: (context, url) =>
+                          const Icon(Icons.tv, size: 40, color: Colors.grey),
+                      errorWidget: (context, url, error) =>
+                          const Icon(Icons.tv, size: 40, color: Colors.grey),
+                    ),
+                  ),
+                  if (isPremiumError)
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: AppColors.richMahogany,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.amber.shade600,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.lock_rounded,
+                          size: 14,
+                          color: Colors.amber,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
             const SizedBox(width: 30),
@@ -116,10 +148,12 @@ class ChannelInfo extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
-                  const Text(
-                    "Now Playing",
+                  Text(
+                    isPremiumError ? "Subscription Required" : "Now Playing",
                     style: TextStyle(
-                      color: AppColors.lightBronze,
+                      color: isPremiumError
+                          ? Colors.amber.shade300
+                          : AppColors.lightBronze,
                       fontSize: 18,
                       fontWeight: FontWeight.w500,
                     ),
