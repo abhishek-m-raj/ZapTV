@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:zaptv/core/config/locator.dart';
 import 'package:zaptv/core/services/jiotvgo_process_service.dart';
 import 'package:zaptv/core/services/talker_service.dart';
+import 'package:zaptv/core/theme/app_theme.dart';
 import 'package:zaptv/core/widgets/custom_tv_text_field.dart';
 import 'package:zaptv/core/widgets/tv_focusable_button.dart';
 import 'package:custom_tv_text_field/custom_tv_text_field.dart';
@@ -89,7 +90,9 @@ class _JiotvLoginDialogState extends State<JiotvLoginDialog> {
         _statusMessage = res['message'];
         if (_isSuccess) {
           _otpSent = true;
-          talker.info('[LoginDialog] OTP sent successfully, state set to otpSent=true');
+          talker.info(
+            '[LoginDialog] OTP sent successfully, state set to otpSent=true',
+          );
         }
       });
     }
@@ -98,7 +101,9 @@ class _JiotvLoginDialogState extends State<JiotvLoginDialog> {
   Future<void> _handleVerifyOtp() async {
     final mobile = _mobileController.text.trim();
     final otp = _otpController.text.trim();
-    talker.info('[LoginDialog] Verify OTP clicked for mobile: $mobile, otp length: ${otp.length}');
+    talker.info(
+      '[LoginDialog] Verify OTP clicked for mobile: $mobile, otp length: ${otp.length}',
+    );
     if (otp.length < 4) {
       talker.warning('[LoginDialog] Invalid OTP length: ${otp.length}');
       setState(() {
@@ -124,10 +129,10 @@ class _JiotvLoginDialogState extends State<JiotvLoginDialog> {
       });
 
       if (_isSuccess) {
-        talker.info('[LoginDialog] OTP verification successful, restarting server to load credentials...');
+        talker.info(
+          '[LoginDialog] OTP verification successful, restarting server to load credentials...',
+        );
         // Restart the server so it picks up the newly saved credentials.
-        // The server was likely already running (started at app launch without
-        // credentials), so a restart is needed to reload them from disk.
         if (mounted) {
           setState(() {
             _statusMessage = 'Login successful! Starting JioTV server...';
@@ -194,11 +199,25 @@ class _JiotvLoginDialogState extends State<JiotvLoginDialog> {
   Widget build(BuildContext context) {
     if (_alreadyLoggedIn && !_showForm) {
       return AlertDialog(
+        backgroundColor: AppColors.surfaceDialog,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: const Color(0xFF1E212D),
+            width: 1.0,
+          ),
+        ),
         title: Row(
           children: const [
-            Icon(Icons.check_circle, color: Colors.green),
-            SizedBox(width: 8),
-            Text('JioTV Active Session'),
+            Icon(Icons.check_circle_rounded, color: AppColors.lightBronze),
+            SizedBox(width: 10),
+            Text(
+              'JioTV Active Session',
+              style: TextStyle(
+                color: AppColors.almondSilk,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ],
         ),
         content: Column(
@@ -207,12 +226,20 @@ class _JiotvLoginDialogState extends State<JiotvLoginDialog> {
           children: [
             const Text(
               'You are already logged in to JioTV!',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+                color: AppColors.almondSilk,
+              ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Session credentials are automatically saved in app storage and auto-refreshed in the background. You do NOT need to log in again.',
-              style: TextStyle(fontSize: 13, color: Colors.grey),
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                height: 1.4,
+              ),
             ),
             const SizedBox(height: 24),
             TvFocusableButton(
@@ -237,11 +264,25 @@ class _JiotvLoginDialogState extends State<JiotvLoginDialog> {
       focusNode: _dialogFocusNode,
       onKeyEvent: (_, event) => _handleKeyEvent(event),
       child: AlertDialog(
+        backgroundColor: AppColors.surfaceDialog,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: AppColors.claySoil.withValues(alpha: 0.5),
+            width: 1.2,
+          ),
+        ),
         title: Row(
           children: const [
-            Icon(Icons.tv, color: Colors.blue),
-            SizedBox(width: 8),
-            Text('JioTV Authentication'),
+            Icon(Icons.live_tv_rounded, color: AppColors.lightBronze),
+            SizedBox(width: 10),
+            Text(
+              'JioTV Authentication',
+              style: TextStyle(
+                color: AppColors.almondSilk,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ],
         ),
         content: SingleChildScrollView(
@@ -249,9 +290,13 @@ class _JiotvLoginDialogState extends State<JiotvLoginDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
+              Text(
                 'Authenticate with your Jio number to enable JioTV live channels.',
-                style: TextStyle(fontSize: 13, color: Colors.grey),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                  height: 1.3,
+                ),
               ),
               const SizedBox(height: 16),
               if (!_otpSent) ...[
@@ -267,7 +312,10 @@ class _JiotvLoginDialogState extends State<JiotvLoginDialog> {
               ] else ...[
                 Text(
                   'OTP sent to +91 ${_mobileController.text}',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.almondSilk,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 CustomTvTextField(
@@ -284,14 +332,26 @@ class _JiotvLoginDialogState extends State<JiotvLoginDialog> {
                 Text(
                   _statusMessage!,
                   style: TextStyle(
-                    color: _isSuccess ? Colors.green : Colors.redAccent,
+                    color: _isSuccess
+                        ? AppColors.lightBronze
+                        : const Color(0xFFCF6679),
                     fontSize: 13,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
               if (_isLoading) ...[
                 const SizedBox(height: 16),
-                const Center(child: CircularProgressIndicator()),
+                const Center(
+                  child: SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: AppColors.lightBronze,
+                    ),
+                  ),
+                ),
               ],
               const SizedBox(height: 24),
               TvFocusableButton(

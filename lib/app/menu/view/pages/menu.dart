@@ -11,6 +11,7 @@ import 'package:zaptv/app/settings/view/pages/settings_page.dart';
 import 'package:zaptv/core/config/locator.dart';
 import 'package:zaptv/core/services/hive_db.dart';
 import 'package:zaptv/core/services/jiotvgo_process_service.dart';
+import 'package:zaptv/core/theme/app_theme.dart';
 
 class MenuPage extends StatefulWidget {
   final ChannelEntity currentChannel;
@@ -257,7 +258,6 @@ class _MenuPageState extends State<MenuPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final displayed = _displayedChannels;
     final favoritesCount = widget.channels.where((c) => _isFavorite(c)).length;
 
@@ -272,10 +272,10 @@ class _MenuPageState extends State<MenuPage> {
         }
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFF0C0C14),
+        backgroundColor: AppColors.black,
         body: Row(
           children: [
-            // COLLAPSIBLE YOUTUBE-STYLE SIDEBAR
+            // COLLAPSIBLE SIDEBAR
             CollapsibleSidebar(
               key: _sidebarKey,
               selectedCategoryIndex: _selectedCategoryIndex,
@@ -326,7 +326,7 @@ class _MenuPageState extends State<MenuPage> {
             Expanded(
               child: Column(
                 children: [
-                  // TOP CHANNEL PREVIEW HEADER
+                  // TOP CHANNEL PREVIEW HEADER - SOLID DARK SURFACE
                   ValueListenableBuilder<ChannelEntity?>(
                     valueListenable: _focusedChannelNotifier,
                     builder: (context, activeChannel, child) {
@@ -340,14 +340,13 @@ class _MenuPageState extends State<MenuPage> {
                           horizontal: 28.0,
                           vertical: 20.0,
                         ),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              const Color(0xFF161626).withValues(alpha: 0.9),
-                              const Color(0xFF0C0C14).withValues(alpha: 0.0),
-                            ],
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
+                        decoration: const BoxDecoration(
+                          color: AppColors.black,
+                          border: Border(
+                            bottom: BorderSide(
+                              color: Color(0xFF161822),
+                              width: 1.0,
+                            ),
                           ),
                         ),
                         child: Row(
@@ -361,12 +360,12 @@ class _MenuPageState extends State<MenuPage> {
                                 children: [
                                   Text(
                                     activeChannel.name,
-                                    style: theme.textTheme.headlineMedium
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.w800,
-                                          color: Colors.white,
-                                          letterSpacing: -0.5,
-                                        ),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.almondSilk,
+                                      fontSize: 28,
+                                      letterSpacing: -0.5,
+                                    ),
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -379,30 +378,19 @@ class _MenuPageState extends State<MenuPage> {
                                           vertical: 4,
                                         ),
                                         decoration: BoxDecoration(
-                                          gradient: LinearGradient(
-                                            colors: [
-                                              theme.colorScheme.primary,
-                                              theme.colorScheme.tertiary,
-                                            ],
+                                          color: const Color(0xFF10121A),
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(
+                                            color: const Color(0xFF1E212D),
+                                            width: 1,
                                           ),
-                                          borderRadius: BorderRadius.circular(
-                                            6,
-                                          ),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: theme.colorScheme.primary
-                                                  .withValues(alpha: 0.4),
-                                              blurRadius: 8,
-                                              spreadRadius: 1,
-                                            ),
-                                          ],
                                         ),
                                         child: const Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
                                             Icon(
                                               Icons.fiber_manual_record,
-                                              color: Colors.white,
+                                              color: AppColors.lightBronze,
                                               size: 8,
                                             ),
                                             SizedBox(width: 5),
@@ -411,7 +399,7 @@ class _MenuPageState extends State<MenuPage> {
                                               style: TextStyle(
                                                 fontWeight: FontWeight.w900,
                                                 fontSize: 11,
-                                                color: Colors.white,
+                                                color: AppColors.almondSilk,
                                                 letterSpacing: 0.8,
                                               ),
                                             ),
@@ -426,22 +414,17 @@ class _MenuPageState extends State<MenuPage> {
                                             vertical: 4,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: Colors.white.withValues(
-                                              alpha: 0.08,
-                                            ),
-                                            borderRadius: BorderRadius.circular(
-                                              6,
-                                            ),
+                                            color: const Color(0xFF10121A),
+                                            borderRadius: BorderRadius.circular(4),
                                             border: Border.all(
-                                              color: Colors.white.withValues(
-                                                alpha: 0.12,
-                                              ),
+                                              color: const Color(0xFF1E212D),
+                                              width: 1,
                                             ),
                                           ),
                                           child: Text(
                                             activeChannel.group,
                                             style: const TextStyle(
-                                              color: Colors.white70,
+                                              color: AppColors.lightBronze,
                                               fontSize: 12,
                                               fontWeight: FontWeight.w600,
                                             ),
@@ -456,16 +439,11 @@ class _MenuPageState extends State<MenuPage> {
                                             vertical: 4,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: Colors.amber.withValues(
-                                              alpha: 0.15,
-                                            ),
-                                            borderRadius: BorderRadius.circular(
-                                              6,
-                                            ),
+                                            color: const Color(0xFF10121A),
+                                            borderRadius: BorderRadius.circular(4),
                                             border: Border.all(
-                                              color: Colors.amber.withValues(
-                                                alpha: 0.3,
-                                              ),
+                                              color: const Color(0xFF1E212D),
+                                              width: 1,
                                             ),
                                           ),
                                           child: const Row(
@@ -473,14 +451,14 @@ class _MenuPageState extends State<MenuPage> {
                                             children: [
                                               Icon(
                                                 Icons.star_rounded,
-                                                color: Colors.amber,
+                                                color: AppColors.lightBronze,
                                                 size: 14,
                                               ),
                                               SizedBox(width: 4),
                                               Text(
                                                 "Favorite",
                                                 style: TextStyle(
-                                                  color: Colors.amber,
+                                                  color: AppColors.lightBronze,
                                                   fontSize: 11,
                                                   fontWeight: FontWeight.bold,
                                                 ),
@@ -501,15 +479,15 @@ class _MenuPageState extends State<MenuPage> {
                               height: 140,
                               clipBehavior: Clip.antiAlias,
                               decoration: BoxDecoration(
-                                color: const Color(0xFF181826),
-                                borderRadius: BorderRadius.circular(16),
+                                color: const Color(0xFF0C0E14),
+                                borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.15),
-                                  width: 1.5,
+                                  color: const Color(0xFF1E212D),
+                                  width: 1.0,
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.6),
+                                    color: Colors.black.withValues(alpha: 0.5),
                                     blurRadius: 16,
                                     spreadRadius: 2,
                                     offset: const Offset(0, 4),
@@ -531,13 +509,13 @@ class _MenuPageState extends State<MenuPage> {
                                       placeholder: (context, url) => const Icon(
                                         Icons.tv_rounded,
                                         size: 60,
-                                        color: Colors.white24,
+                                        color: AppColors.claySoil,
                                       ),
                                       errorWidget: (context, url, error) =>
                                           const Icon(
                                             Icons.tv_rounded,
                                             size: 60,
-                                            color: Colors.white24,
+                                            color: AppColors.claySoil,
                                           ),
                                     ),
                                   ),
@@ -570,16 +548,21 @@ class _MenuPageState extends State<MenuPage> {
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(
+                                    Icon(
                                       Icons.search_off_rounded,
                                       size: 56,
-                                      color: Colors.white24,
+                                      color: AppColors.claySoil.withValues(
+                                        alpha: 0.5,
+                                      ),
                                     ),
                                     const SizedBox(height: 12),
-                                    Text(
+                                    const Text(
                                       "No channels found in this category",
-                                      style: theme.textTheme.titleMedium
-                                          ?.copyWith(color: Colors.white54),
+                                      style: TextStyle(
+                                        color: AppColors.lightBronze,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -650,7 +633,7 @@ class _MenuPageState extends State<MenuPage> {
 }
 
 // ---------------------------------------------------------------------------
-// CHANNEL GRID TILE
+// CHANNEL GRID TILE - CRISP SOLID SURFACES & HAIRLINE EDGES
 // ---------------------------------------------------------------------------
 class ChannelGridTile extends StatefulWidget {
   final ChannelEntity channel;
@@ -749,8 +732,6 @@ class _ChannelGridTileState extends State<ChannelGridTile> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return RepaintBoundary(
       child: Focus(
         focusNode: widget.focusNode,
@@ -827,30 +808,28 @@ class _ChannelGridTileState extends State<ChannelGridTile> {
             ),
             decoration: BoxDecoration(
               color: _isFocused
-                  ? const Color(0xFF222234)
-                  : const Color(0xFF161622),
+                  ? const Color(0xFF141622)
+                  : const Color(0xFF0C0E14),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: _isFocused
-                    ? Colors.white
+                    ? AppColors.lightBronze
                     : (widget.isPlaying
-                          ? theme.colorScheme.primary
-                          : Colors.white.withValues(alpha: 0.08)),
-                width: _isFocused ? 3 : (widget.isPlaying ? 2 : 1),
+                          ? AppColors.lightBronze
+                          : const Color(0xFF1A1C26)),
+                width: _isFocused ? 2.5 : (widget.isPlaying ? 2 : 1),
               ),
               boxShadow: _isFocused
                   ? [
                       BoxShadow(
-                        color: theme.colorScheme.primary.withValues(
-                          alpha: 0.55,
-                        ),
-                        blurRadius: 18,
-                        spreadRadius: 2,
+                        color: AppColors.lightBronze.withValues(alpha: 0.35),
+                        blurRadius: 16,
+                        spreadRadius: 1,
                       ),
                     ]
                   : [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.3),
+                        color: Colors.black.withValues(alpha: 0.4),
                         blurRadius: 6,
                         offset: const Offset(0, 2),
                       ),
@@ -871,12 +850,12 @@ class _ChannelGridTileState extends State<ChannelGridTile> {
                     placeholder: (context, url) => const Icon(
                       Icons.tv_rounded,
                       size: 40,
-                      color: Colors.white24,
+                      color: AppColors.claySoil,
                     ),
                     errorWidget: (context, url, error) => const Icon(
                       Icons.tv_rounded,
                       size: 40,
-                      color: Colors.white24,
+                      color: AppColors.claySoil,
                     ),
                   ),
                 ),
@@ -884,11 +863,14 @@ class _ChannelGridTileState extends State<ChannelGridTile> {
                 Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(13),
-                    gradient: const LinearGradient(
-                      colors: [Color(0xEE0B0B12), Colors.transparent],
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.black.withValues(alpha: 0.92),
+                        Colors.transparent,
+                      ],
                       begin: Alignment.bottomCenter,
                       end: Alignment.topCenter,
-                      stops: [0.0, 0.45],
+                      stops: const [0.0, 0.48],
                     ),
                   ),
                 ),
@@ -903,7 +885,7 @@ class _ChannelGridTileState extends State<ChannelGridTile> {
                         child: Text(
                           widget.channel.name,
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: AppColors.almondSilk,
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
                             shadows: [
@@ -924,15 +906,15 @@ class _ChannelGridTileState extends State<ChannelGridTile> {
                             ScaleTransition(scale: animation, child: child),
                         child: widget.isFavorite
                             ? const Padding(
-                                key: ValueKey('fav_star'),
+                                key: ValueKey("fav_star"),
                                 padding: EdgeInsets.only(left: 4.0),
                                 child: Icon(
                                   Icons.star_rounded,
-                                  color: Colors.amber,
+                                  color: AppColors.lightBronze,
                                   size: 16,
                                 ),
                               )
-                            : const SizedBox.shrink(key: ValueKey('no_fav')),
+                            : const SizedBox.shrink(key: ValueKey("no_fav")),
                       ),
                     ],
                   ),
@@ -948,22 +930,12 @@ class _ChannelGridTileState extends State<ChannelGridTile> {
                         vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            theme.colorScheme.primary,
-                            theme.colorScheme.tertiary,
-                          ],
+                        color: AppColors.richMahogany,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: AppColors.lightBronze,
+                          width: 1,
                         ),
-                        borderRadius: BorderRadius.circular(6),
-                        boxShadow: [
-                          BoxShadow(
-                            color: theme.colorScheme.primary.withValues(
-                              alpha: 0.4,
-                            ),
-                            blurRadius: 6,
-                            spreadRadius: 1,
-                          ),
-                        ],
                       ),
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
@@ -971,15 +943,16 @@ class _ChannelGridTileState extends State<ChannelGridTile> {
                           Icon(
                             Icons.play_arrow_rounded,
                             size: 12,
-                            color: Colors.white,
+                            color: AppColors.almondSilk,
                           ),
                           SizedBox(width: 2),
                           Text(
                             "NOW",
                             style: TextStyle(
-                              color: Colors.white,
+                              color: AppColors.almondSilk,
                               fontSize: 9,
                               fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
                             ),
                           ),
                         ],

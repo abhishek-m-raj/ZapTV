@@ -1,40 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:zaptv/core/theme/app_theme.dart';
 
 class TvFocusableButton extends StatefulWidget {
   final VoidCallback onPressed;
-  final Widget? icon;
   final Widget label;
-  final bool isJioLoggedIn;
-  final bool isFocused;
-  final bool autofocus;
+  final Widget? icon;
   final FocusNode? focusNode;
-  final Color? unfocusedBackgroundColor;
+  final bool autofocus;
+  final bool isFocused;
+  final bool isJioLoggedIn;
   final Color? focusedBackgroundColor;
-  final Color? unfocusedTextColor;
+  final Color? unfocusedBackgroundColor;
   final Color? focusedTextColor;
-  final Color? unfocusedBorderColor;
+  final Color? unfocusedTextColor;
   final Color? focusedBorderColor;
+  final Color? unfocusedBorderColor;
   final EdgeInsetsGeometry? padding;
   final double borderRadius;
 
   const TvFocusableButton({
     super.key,
     required this.onPressed,
-    this.icon,
     required this.label,
-    this.isJioLoggedIn = false,
-    this.isFocused = false,
-    this.autofocus = false,
+    this.icon,
     this.focusNode,
-    this.unfocusedBackgroundColor,
+    this.autofocus = false,
+    this.isFocused = false,
+    this.isJioLoggedIn = false,
     this.focusedBackgroundColor,
-    this.unfocusedTextColor,
+    this.unfocusedBackgroundColor,
     this.focusedTextColor,
-    this.unfocusedBorderColor,
+    this.unfocusedTextColor,
     this.focusedBorderColor,
+    this.unfocusedBorderColor,
     this.padding,
-    this.borderRadius = 10,
+    this.borderRadius = 8.0,
   });
 
   @override
@@ -45,48 +46,62 @@ class _TvFocusableButtonState extends State<TvFocusableButton> {
   bool _isFocused = false;
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.focusNode != null) {
+      _isFocused = widget.focusNode!.hasFocus;
+      widget.focusNode!.addListener(_onFocusChange);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant TvFocusableButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusNode != widget.focusNode) {
+      oldWidget.focusNode?.removeListener(_onFocusChange);
+      widget.focusNode?.addListener(_onFocusChange);
+      if (widget.focusNode != null) {
+        _isFocused = widget.focusNode!.hasFocus;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.focusNode?.removeListener(_onFocusChange);
+    super.dispose();
+  }
+
+  void _onFocusChange() {
+    if (mounted && widget.focusNode != null) {
+      if (_isFocused != widget.focusNode!.hasFocus) {
+        setState(() {
+          _isFocused = widget.focusNode!.hasFocus;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final hasFocus = _isFocused || widget.isFocused;
 
-    Color bg;
-    Color border;
-    Color fg;
+    final bg = hasFocus
+        ? (widget.focusedBackgroundColor ?? AppColors.lightBronze)
+        : (widget.unfocusedBackgroundColor ?? const Color(0xFF10121A));
 
-    if (widget.isJioLoggedIn) {
-      if (hasFocus) {
-        bg = widget.focusedBackgroundColor ?? Colors.green.shade600;
-        border = widget.focusedBorderColor ?? Colors.white;
-        fg = widget.focusedTextColor ?? Colors.white;
-      } else {
-        bg =
-            widget.unfocusedBackgroundColor ??
-            Colors.green.shade900.withValues(alpha: 0.5);
-        border =
-            widget.unfocusedBorderColor ??
-            Colors.green.shade400.withValues(alpha: 0.4);
-        fg = widget.unfocusedTextColor ?? Colors.green.shade200;
-      }
-    } else {
-      if (hasFocus) {
-        bg = widget.focusedBackgroundColor ?? Colors.white;
-        border = widget.focusedBorderColor ?? Colors.white;
-        fg = widget.focusedTextColor ?? const Color(0xFF101114);
-      } else {
-        bg = widget.unfocusedBackgroundColor ?? const Color(0xFF20232E);
-        border =
-            widget.unfocusedBorderColor ?? Colors.white.withValues(alpha: 0.12);
-        fg = widget.unfocusedTextColor ?? Colors.white;
-      }
-    }
+    final fg = hasFocus
+        ? (widget.focusedTextColor ?? AppColors.black)
+        : (widget.unfocusedTextColor ?? AppColors.almondSilk);
 
-    return Shortcuts(
-      shortcuts: <ShortcutActivator, Intent>{
+    final border = hasFocus
+        ? (widget.focusedBorderColor ?? AppColors.almondSilk)
+        : (widget.unfocusedBorderColor ?? const Color(0xFF1E212D));
+
+    return FocusableActionDetector(
+      shortcuts: {
         const SingleActivator(LogicalKeyboardKey.enter, includeRepeats: false):
             const ActivateIntent(),
-        const SingleActivator(
-          LogicalKeyboardKey.numpadEnter,
-          includeRepeats: false,
-        ): const ActivateIntent(),
         const SingleActivator(LogicalKeyboardKey.select, includeRepeats: false):
             const ActivateIntent(),
         const SingleActivator(LogicalKeyboardKey.space, includeRepeats: false):
@@ -121,17 +136,6 @@ class _TvFocusableButtonState extends State<TvFocusableButton> {
             color: bg,
             borderRadius: BorderRadius.circular(widget.borderRadius),
             border: Border.all(color: border, width: hasFocus ? 2.0 : 1.0),
-            boxShadow: hasFocus
-                ? [
-                    BoxShadow(
-                      color: widget.isJioLoggedIn
-                          ? Colors.green.withValues(alpha: 0.35)
-                          : Colors.white.withValues(alpha: 0.2),
-                      blurRadius: 10,
-                      spreadRadius: 1,
-                    ),
-                  ]
-                : [],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -149,7 +153,7 @@ class _TvFocusableButtonState extends State<TvFocusableButton> {
                   color: fg,
                   fontWeight: FontWeight.bold,
                   fontSize: 15,
-                  letterSpacing: 0.2,
+                  letterSpacing: 0.3,
                 ),
                 child: widget.label,
               ),

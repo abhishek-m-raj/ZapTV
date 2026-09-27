@@ -3,6 +3,7 @@ import 'package:zaptv/app/menu/view/widgets/jiotv_login_dialog.dart';
 import 'package:zaptv/core/config/locator.dart';
 import 'package:zaptv/core/services/jiotvgo_process_service.dart';
 import 'package:zaptv/core/services/settings_service.dart';
+import 'package:zaptv/core/theme/app_theme.dart';
 import 'package:zaptv/core/widgets/tv_focusable_button.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -65,27 +66,30 @@ class _SettingsPageState extends State<SettingsPage> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1B1E29),
+        backgroundColor: AppColors.surfaceDialog,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: Colors.white12),
+          side: BorderSide(
+            color: AppColors.claySoil.withValues(alpha: 0.5),
+            width: 1.2,
+          ),
         ),
         title: const Row(
           children: [
-            Icon(Icons.logout, color: Colors.amber, size: 24),
+            Icon(Icons.logout_rounded, color: AppColors.lightBronze, size: 24),
             SizedBox(width: 10),
             Text(
               "Log Out of JioTV?",
               style: TextStyle(
-                color: Colors.white,
+                color: AppColors.almondSilk,
                 fontWeight: FontWeight.bold,
               ),
             ),
           ],
         ),
-        content: const Text(
+        content: Text(
           "Are you sure you want to log out? JioTV live channels will be disabled until you log in again.",
-          style: TextStyle(color: Colors.white70, fontSize: 14),
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
         ),
         actions: [
           TvFocusableButton(
@@ -97,10 +101,14 @@ class _SettingsPageState extends State<SettingsPage> {
           TvFocusableButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             label: const Text("Log Out"),
-            unfocusedBackgroundColor: Colors.red.withValues(alpha: 0.15),
-            unfocusedTextColor: Colors.redAccent,
-            focusedBackgroundColor: Colors.redAccent,
-            focusedTextColor: Colors.white,
+            unfocusedBackgroundColor: AppColors.richMahogany.withValues(
+              alpha: 0.5,
+            ),
+            unfocusedTextColor: AppColors.almondSilk,
+            unfocusedBorderColor: AppColors.claySoil.withValues(alpha: 0.5),
+            focusedBackgroundColor: AppColors.richMahogany,
+            focusedBorderColor: AppColors.lightBronze,
+            focusedTextColor: AppColors.almondSilk,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           ),
         ],
@@ -118,13 +126,21 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0E13),
+      backgroundColor: AppColors.black,
       body: Row(
         children: [
           // LEFT NAVIGATION RAIL
           Container(
             width: 270,
-            color: const Color(0xFF13151D),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceSidebar,
+              border: Border(
+                right: BorderSide(
+                  color: const Color(0xFF161822),
+                  width: 1,
+                ),
+              ),
+            ),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 32),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -137,12 +153,16 @@ class _SettingsPageState extends State<SettingsPage> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(8),
+                          color: const Color(0xFF10121A),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: const Color(0xFF1E212D),
+                            width: 1.0,
+                          ),
                         ),
                         child: const Icon(
-                          Icons.settings,
-                          color: Colors.white,
+                          Icons.settings_rounded,
+                          color: AppColors.lightBronze,
                           size: 20,
                         ),
                       ),
@@ -150,7 +170,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       const Text(
                         "Settings",
                         style: TextStyle(
-                          color: Colors.white,
+                          color: AppColors.almondSilk,
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 0.5,
@@ -160,7 +180,10 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                const Divider(color: Colors.white10, height: 1),
+                Divider(
+                  color: AppColors.claySoil.withValues(alpha: 0.25),
+                  height: 1,
+                ),
                 const SizedBox(height: 20),
 
                 // Nav Tabs
@@ -176,7 +199,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   label: "JioTV Account",
                   isSelected: _selectedTabIndex == 1,
                   badgeText: _isJioLoggedIn ? "ACTIVE" : null,
-                  badgeColor: const Color(0xFF00E676),
+                  badgeColor: AppColors.lightBronze,
                   onSelect: () => setState(() => _selectedTabIndex = 1),
                 ),
                 const SizedBox(height: 8),
@@ -192,16 +215,15 @@ class _SettingsPageState extends State<SettingsPage> {
                   child: Text(
                     "ZapTV v1.0.0",
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.3),
+                      color: AppColors.claySoil.withValues(alpha: 0.8),
                       fontSize: 12,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
               ],
             ),
           ),
-
-          const VerticalDivider(color: Colors.white10, width: 1),
 
           // RIGHT CONTENT PANE
           Expanded(
@@ -287,15 +309,20 @@ class _SettingsPageState extends State<SettingsPage> {
           Container(
             padding: const EdgeInsets.all(32),
             decoration: BoxDecoration(
-              color: const Color(0xFF161822),
+              color: AppColors.surfaceCard,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.white10),
+              border: Border.all(
+                color: AppColors.claySoil.withValues(alpha: 0.3),
+              ),
             ),
             child: const Center(
               child: SizedBox(
                 width: 28,
                 height: 28,
-                child: CircularProgressIndicator(strokeWidth: 2.5),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: AppColors.lightBronze,
+                ),
               ),
             ),
           )
@@ -303,12 +330,12 @@ class _SettingsPageState extends State<SettingsPage> {
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: const Color(0xFF161822),
+              color: AppColors.surfaceCard,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: _isJioLoggedIn
-                    ? const Color(0xFF00E676).withValues(alpha: 0.3)
-                    : Colors.amber.withValues(alpha: 0.3),
+                    ? AppColors.lightBronze.withValues(alpha: 0.6)
+                    : AppColors.claySoil.withValues(alpha: 0.5),
                 width: 1.5,
               ),
             ),
@@ -321,16 +348,17 @@ class _SettingsPageState extends State<SettingsPage> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: _isJioLoggedIn
-                            ? const Color(0xFF00E676).withValues(alpha: 0.15)
-                            : Colors.amber.withValues(alpha: 0.15),
+                        color: const Color(0xFF10121A),
                         borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFF1E212D),
+                        ),
                       ),
                       child: Icon(
-                        _isJioLoggedIn ? Icons.verified : Icons.cell_tower,
-                        color: _isJioLoggedIn
-                            ? const Color(0xFF00E676)
-                            : Colors.amber,
+                        _isJioLoggedIn
+                            ? Icons.verified_rounded
+                            : Icons.cell_tower_rounded,
+                        color: AppColors.lightBronze,
                         size: 30,
                       ),
                     ),
@@ -344,7 +372,7 @@ class _SettingsPageState extends State<SettingsPage> {
                               const Text(
                                 "JioTV Mobile Account",
                                 style: TextStyle(
-                                  color: Colors.white,
+                                  color: AppColors.almondSilk,
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -356,16 +384,12 @@ class _SettingsPageState extends State<SettingsPage> {
                                   vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: _isJioLoggedIn
-                                      ? const Color(
-                                          0xFF00E676,
-                                        ).withValues(alpha: 0.2)
-                                      : Colors.amber.withValues(alpha: 0.2),
+                                  color: const Color(0xFF10121A),
                                   borderRadius: BorderRadius.circular(6),
                                   border: Border.all(
                                     color: _isJioLoggedIn
-                                        ? const Color(0xFF00E676)
-                                        : Colors.amber,
+                                        ? AppColors.lightBronze.withValues(alpha: 0.5)
+                                        : const Color(0xFF1E212D),
                                     width: 1,
                                   ),
                                 ),
@@ -375,11 +399,13 @@ class _SettingsPageState extends State<SettingsPage> {
                                       : "NOT CONNECTED",
                                   style: TextStyle(
                                     color: _isJioLoggedIn
-                                        ? const Color(0xFF00E676)
-                                        : Colors.amber,
+                                        ? AppColors.lightBronze
+                                        : AppColors.almondSilk.withValues(
+                                            alpha: 0.7,
+                                          ),
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
-                                    letterSpacing: 0.6,
+                                    letterSpacing: 0.8,
                                   ),
                                 ),
                               ),
@@ -390,8 +416,8 @@ class _SettingsPageState extends State<SettingsPage> {
                             _isJioLoggedIn
                                 ? "Authenticated successfully. JioTV live channels are active in your playlist and streaming locally via FFI on port 5050."
                                 : "Log in using your Jio phone number to access full live channels, sports broadcasts, and regional networks.",
-                            style: const TextStyle(
-                              color: Colors.white70,
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
                               fontSize: 14,
                               height: 1.4,
                             ),
@@ -402,7 +428,10 @@ class _SettingsPageState extends State<SettingsPage> {
                   ],
                 ),
                 const SizedBox(height: 24),
-                const Divider(color: Colors.white10, height: 1),
+                Divider(
+                  color: AppColors.claySoil.withValues(alpha: 0.25),
+                  height: 1,
+                ),
                 const SizedBox(height: 20),
                 Row(
                   children: [
@@ -425,13 +454,15 @@ class _SettingsPageState extends State<SettingsPage> {
                         onPressed: _handleLogout,
                         icon: const Icon(Icons.logout),
                         label: const Text("Log Out"),
-                        unfocusedBackgroundColor: Colors.red.withValues(
-                          alpha: 0.15,
+                        unfocusedBackgroundColor: AppColors.richMahogany
+                            .withValues(alpha: 0.5),
+                        unfocusedTextColor: AppColors.almondSilk,
+                        unfocusedBorderColor: AppColors.claySoil.withValues(
+                          alpha: 0.5,
                         ),
-                        unfocusedTextColor: Colors.redAccent,
-                        focusedBackgroundColor: Colors.redAccent,
-                        focusedTextColor: Colors.white,
-                        focusedBorderColor: Colors.white,
+                        focusedBackgroundColor: AppColors.richMahogany,
+                        focusedBorderColor: AppColors.lightBronze,
+                        focusedTextColor: AppColors.almondSilk,
                       ),
                     ],
                   ],
@@ -453,19 +484,29 @@ class _SettingsPageState extends State<SettingsPage> {
         Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: const Color(0xFF161822),
+            color: AppColors.surfaceCard,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white10),
+            border: Border.all(
+              color: AppColors.claySoil.withValues(alpha: 0.35),
+            ),
           ),
           child: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.08),
+                  color: const Color(0xFF10121A),
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: const Color(0xFF1E212D),
+                    width: 1.0,
+                  ),
                 ),
-                child: const Icon(Icons.tv, color: Colors.white, size: 36),
+                child: const Icon(
+                  Icons.tv,
+                  color: AppColors.lightBronze,
+                  size: 36,
+                ),
               ),
               const SizedBox(width: 20),
               Column(
@@ -474,10 +515,10 @@ class _SettingsPageState extends State<SettingsPage> {
                   const Text(
                     "ZapTV",
                     style: TextStyle(
-                      color: Colors.white,
+                      color: AppColors.almondSilk,
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
-                      letterSpacing: 0.3,
+                      letterSpacing: 0.5,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -487,13 +528,16 @@ class _SettingsPageState extends State<SettingsPage> {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.1),
+                      color: AppColors.surfaceElevated,
                       borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: AppColors.claySoil.withValues(alpha: 0.4),
+                      ),
                     ),
                     child: const Text(
                       "v1.0.0",
                       style: TextStyle(
-                        color: Colors.white,
+                        color: AppColors.lightBronze,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -557,12 +601,14 @@ class _AboutInfoTileState extends State<_AboutInfoTile> {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         decoration: BoxDecoration(
-          color: _isFocused ? const Color(0xFF222634) : const Color(0xFF161822),
+          color: _isFocused
+              ? const Color(0xFF141622)
+              : AppColors.surfaceCard,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: _isFocused
-                ? Colors.white
-                : Colors.white.withValues(alpha: 0.08),
+                ? AppColors.lightBronze
+                : const Color(0xFF1A1C26),
             width: _isFocused ? 2.0 : 1.0,
           ),
         ),
@@ -571,12 +617,19 @@ class _AboutInfoTileState extends State<_AboutInfoTile> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.06),
+                color: _isFocused
+                    ? AppColors.lightBronze
+                    : const Color(0xFF141620),
                 borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: _isFocused
+                      ? AppColors.almondSilk
+                      : const Color(0xFF1E212D),
+                ),
               ),
               child: Icon(
                 widget.icon,
-                color: _isFocused ? Colors.white : Colors.white70,
+                color: _isFocused ? AppColors.black : AppColors.lightBronze,
                 size: 20,
               ),
             ),
@@ -588,7 +641,9 @@ class _AboutInfoTileState extends State<_AboutInfoTile> {
                   Text(
                     widget.title,
                     style: TextStyle(
-                      color: _isFocused ? Colors.white70 : Colors.white54,
+                      color: _isFocused
+                          ? AppColors.lightBronze
+                          : AppColors.textMuted,
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                     ),
@@ -598,8 +653,8 @@ class _AboutInfoTileState extends State<_AboutInfoTile> {
                     widget.value,
                     style: TextStyle(
                       color: _isFocused
-                          ? Colors.white
-                          : Colors.white.withValues(alpha: 0.9),
+                          ? AppColors.almondSilk
+                          : AppColors.almondSilk.withValues(alpha: 0.85),
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.2,
@@ -629,7 +684,7 @@ class _SectionHeader extends StatelessWidget {
         Text(
           title,
           style: const TextStyle(
-            color: Colors.white,
+            color: AppColors.almondSilk,
             fontSize: 24,
             fontWeight: FontWeight.bold,
             letterSpacing: 0.2,
@@ -638,8 +693,8 @@ class _SectionHeader extends StatelessWidget {
         const SizedBox(height: 6),
         Text(
           subtitle,
-          style: const TextStyle(
-            color: Colors.white60,
+          style: TextStyle(
+            color: AppColors.textMuted,
             fontSize: 14,
             height: 1.3,
           ),
@@ -675,7 +730,30 @@ class _SettingsNavItemState extends State<_SettingsNavItem> {
 
   @override
   Widget build(BuildContext context) {
-    final active = widget.isSelected || _isFocused;
+    Color bg;
+    Color fg;
+    Color iconColor;
+    Border? border;
+
+    if (_isFocused) {
+      bg = AppColors.lightBronze;
+      fg = AppColors.black;
+      iconColor = AppColors.black;
+      border = Border.all(color: AppColors.almondSilk, width: 1.5);
+    } else if (widget.isSelected) {
+      bg = const Color(0xFF141620);
+      fg = AppColors.almondSilk;
+      iconColor = AppColors.lightBronze;
+      border = Border.all(
+        color: AppColors.lightBronze.withValues(alpha: 0.4),
+        width: 1,
+      );
+    } else {
+      bg = Colors.transparent;
+      fg = AppColors.almondSilk.withValues(alpha: 0.65);
+      iconColor = AppColors.lightBronze.withValues(alpha: 0.45);
+      border = null;
+    }
 
     return InkWell(
       onFocusChange: (focused) {
@@ -688,32 +766,23 @@ class _SettingsNavItemState extends State<_SettingsNavItem> {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: _isFocused
-              ? Colors.white.withValues(alpha: 0.16)
-              : (widget.isSelected
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : Colors.transparent),
+          color: bg,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: _isFocused ? Colors.white : Colors.transparent,
-            width: 1.5,
-          ),
+          border: border,
         ),
         child: Row(
           children: [
-            Icon(
-              widget.icon,
-              color: active ? Colors.white : Colors.white60,
-              size: 20,
-            ),
+            Icon(widget.icon, color: iconColor, size: 20),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 widget.label,
                 style: TextStyle(
-                  color: active ? Colors.white : Colors.white70,
+                  color: fg,
                   fontSize: 14,
-                  fontWeight: active ? FontWeight.bold : FontWeight.w500,
+                  fontWeight: _isFocused || widget.isSelected
+                      ? FontWeight.bold
+                      : FontWeight.w500,
                 ),
               ),
             ),
@@ -722,15 +791,22 @@ class _SettingsNavItemState extends State<_SettingsNavItem> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: (widget.badgeColor ?? Colors.green).withValues(
-                    alpha: 0.2,
-                  ),
+                  color: _isFocused
+                      ? AppColors.black.withValues(alpha: 0.15)
+                      : const Color(0xFF181B26),
                   borderRadius: BorderRadius.circular(4),
+                  border: Border.all(
+                    color: _isFocused
+                        ? AppColors.black.withValues(alpha: 0.3)
+                        : AppColors.lightBronze.withValues(alpha: 0.4),
+                  ),
                 ),
                 child: Text(
                   widget.badgeText!,
                   style: TextStyle(
-                    color: widget.badgeColor ?? Colors.green,
+                    color: _isFocused
+                        ? AppColors.black
+                        : (widget.badgeColor ?? AppColors.lightBronze),
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
                   ),
@@ -791,23 +867,16 @@ class _TvSettingsSwitchTileState extends State<TvSettingsSwitchTile> {
         ),
         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
         decoration: BoxDecoration(
-          color: _isFocused ? const Color(0xFF222634) : const Color(0xFF161822),
+          color: _isFocused
+              ? const Color(0xFF141622)
+              : AppColors.surfaceCard,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: _isFocused
-                ? Colors.white
-                : Colors.white.withValues(alpha: 0.08),
+                ? AppColors.lightBronze
+                : const Color(0xFF1A1C26),
             width: _isFocused ? 2.0 : 1.0,
           ),
-          boxShadow: _isFocused
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.5),
-                    blurRadius: 14,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : [],
         ),
         child: Row(
           children: [
@@ -817,13 +886,18 @@ class _TvSettingsSwitchTileState extends State<TvSettingsSwitchTile> {
               height: 44,
               decoration: BoxDecoration(
                 color: _isFocused
-                    ? Colors.white.withValues(alpha: 0.15)
-                    : Colors.white.withValues(alpha: 0.05),
+                    ? AppColors.lightBronze
+                    : const Color(0xFF141620),
                 borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: _isFocused
+                      ? AppColors.almondSilk
+                      : const Color(0xFF1E212D),
+                ),
               ),
               child: Icon(
                 widget.icon,
-                color: _isFocused ? Colors.white : Colors.white70,
+                color: _isFocused ? AppColors.black : AppColors.lightBronze,
                 size: 22,
               ),
             ),
@@ -837,7 +911,7 @@ class _TvSettingsSwitchTileState extends State<TvSettingsSwitchTile> {
                   Text(
                     widget.title,
                     style: TextStyle(
-                      color: Colors.white,
+                      color: AppColors.almondSilk,
                       fontSize: 16,
                       fontWeight: _isFocused
                           ? FontWeight.bold
@@ -848,7 +922,9 @@ class _TvSettingsSwitchTileState extends State<TvSettingsSwitchTile> {
                   Text(
                     widget.subtitle,
                     style: TextStyle(
-                      color: _isFocused ? Colors.white70 : Colors.white54,
+                      color: _isFocused
+                          ? AppColors.almondSilk.withValues(alpha: 0.8)
+                          : AppColors.textMuted,
                       fontSize: 13,
                       height: 1.3,
                     ),
@@ -868,14 +944,14 @@ class _TvSettingsSwitchTileState extends State<TvSettingsSwitchTile> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(15),
                 color: widget.value
-                    ? (_isFocused
-                          ? const Color(0xFF00E676)
-                          : const Color(0xFF00C853))
-                    : const Color(0xFF2C303E),
+                    ? (_isFocused ? AppColors.lightBronze : AppColors.claySoil)
+                    : AppColors.black,
                 border: Border.all(
                   color: widget.value
-                      ? (_isFocused ? Colors.white : const Color(0xFF00E676))
-                      : Colors.white24,
+                      ? (_isFocused
+                            ? AppColors.almondSilk
+                            : AppColors.lightBronze)
+                      : AppColors.claySoil.withValues(alpha: 0.4),
                   width: 1.5,
                 ),
               ),
@@ -888,16 +964,11 @@ class _TvSettingsSwitchTileState extends State<TvSettingsSwitchTile> {
                 child: Container(
                   width: 22,
                   height: 22,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black38,
-                        blurRadius: 4,
-                        offset: Offset(0, 1),
-                      ),
-                    ],
+                    color: widget.value && _isFocused
+                        ? AppColors.black
+                        : AppColors.almondSilk,
                   ),
                 ),
               ),

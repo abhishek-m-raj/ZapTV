@@ -5,6 +5,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:zaptv/app/home/view/pages/home.dart';
 import 'package:zaptv/core/config/locator.dart';
 import 'package:get_it/get_it.dart';
+import 'package:zaptv/core/theme/app_theme.dart';
 
 final shortcuts = {
   // 🖥️ TV-specific shortcuts
@@ -50,7 +51,7 @@ void configTouchDevices() {
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.light,
-      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarColor: AppColors.black,
       systemNavigationBarIconBrightness: Brightness.light,
     ),
   );
@@ -67,14 +68,7 @@ class ZapTV extends StatelessWidget {
       child: MaterialApp(
         title: 'ZapTV',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          brightness: Brightness.dark,
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.deepPurple,
-            brightness: Brightness.dark,
-          ),
-          useMaterial3: true,
-        ),
+        theme: AppTheme.darkTheme,
         home: const HomePage(),
       ),
     );

@@ -11,6 +11,7 @@ import 'dart:convert';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:zaptv/core/theme/app_theme.dart';
 
 class UpdateManager {
   static const String _repoUrl =
@@ -36,26 +37,25 @@ class UpdateManager {
       log('Android SDK version: $sdkInt');
 
       if (sdkInt >= 33) {
-        final permissions = [
-          Permission.photos,
-          Permission.videos,
-        ];
+        final permissions = [Permission.photos, Permission.videos];
 
-        Map<Permission, PermissionStatus> statuses =
-            await permissions.request();
+        Map<Permission, PermissionStatus> statuses = await permissions
+            .request();
 
         if (await Permission.manageExternalStorage.isDenied) {
-          final manageStorageStatus =
-              await Permission.manageExternalStorage.request();
+          final manageStorageStatus = await Permission.manageExternalStorage
+              .request();
           if (manageStorageStatus.isPermanentlyDenied) {
             await openAppSettings();
             return false;
           }
         }
 
-        return statuses.values.every((status) =>
-            status == PermissionStatus.granted ||
-            status == PermissionStatus.limited);
+        return statuses.values.every(
+          (status) =>
+              status == PermissionStatus.granted ||
+              status == PermissionStatus.limited,
+        );
       } else if (sdkInt >= 30) {
         final status = await Permission.manageExternalStorage.request();
 
@@ -67,18 +67,17 @@ class UpdateManager {
 
         return status.isGranted;
       } else if (sdkInt >= 23) {
-        final permissions = [
-          Permission.storage,
-        ];
+        final permissions = [Permission.storage];
 
-        Map<Permission, PermissionStatus> statuses =
-            await permissions.request();
+        Map<Permission, PermissionStatus> statuses = await permissions
+            .request();
 
         bool allGranted = statuses.values.every((status) => status.isGranted);
 
         if (!allGranted) {
-          bool permanentlyDenied =
-              statuses.values.any((status) => status.isPermanentlyDenied);
+          bool permanentlyDenied = statuses.values.any(
+            (status) => status.isPermanentlyDenied,
+          );
           if (permanentlyDenied) {
             await _showPermissionDialog();
             await openAppSettings();
@@ -118,20 +117,19 @@ class UpdateManager {
     }
   }
 
-  Future<void> checkForUpdates(
-      BuildContext context, bool canShowUpdate) async {
+  Future<void> checkForUpdates(BuildContext context, bool canShowUpdate) async {
     if (canShowUpdate) {
       canShowUpdate = false;
 
       final hasStoragePermission = await _requestStoragePermissions();
       if (!hasStoragePermission) {
-        print("Storage permission is required to download updates");
+        debugPrint("Storage permission is required to download updates");
         return;
       }
 
       final hasInstallPermission = await _checkInstallPermission();
       if (!hasInstallPermission) {
-        print("Install permission is required to update the app");
+        debugPrint("Install permission is required to update the app");
         return;
       }
 
@@ -140,7 +138,7 @@ class UpdateManager {
         final latestRelease = await _fetchLatestRelease();
 
         if (latestRelease == null) {
-          print("Failed to check for updates");
+          debugPrint("Failed to check for updates");
           return;
         }
 
@@ -155,18 +153,23 @@ class UpdateManager {
           'linux': getDownloadUrlByArch(assets, '.AppImage'),
         };
 
-        if (_shouldUpdate(currentVersion, latestRelease['tag_name'])) {
-          _showUpdateBottomSheet(context, currentVersion,
-              latestRelease['tag_name'], latestRelease['body'], downloadUrls);
+        if (context.mounted &&
+            _shouldUpdate(currentVersion, latestRelease['tag_name'])) {
+          _showUpdateBottomSheet(
+            context,
+            currentVersion,
+            latestRelease['tag_name'],
+            latestRelease['body'],
+            downloadUrls,
+          );
         } else {
-          print("You're already using the latest version");
+          debugPrint("You're already using the latest version");
         }
       } catch (e) {
         debugPrint('Error checking for updates: $e');
-        print("Error checking for updates: ${e.toString()}");
       }
     } else {
-      print("Skipping Update Popup");
+      debugPrint("Skipping Update Popup");
     }
   }
 
@@ -263,13 +266,9 @@ class _UpdateBottomSheetState extends State<UpdateBottomSheet>
       duration: const Duration(seconds: 2),
       vsync: this,
     )..repeat(reverse: true);
-    _pulseAnimation = Tween<double>(
-      begin: 0.8,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _pulseController,
-      curve: Curves.easeInOut,
-    ));
+    _pulseAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
   }
 
   @override
@@ -370,8 +369,10 @@ class _UpdateBottomSheetState extends State<UpdateBottomSheet>
     });
 
     // Install APK
-    final result =
-        await InstallPlugin.installApk(savePath, appId: 'com.ryan.anymex');
+    final result = await InstallPlugin.installApk(
+      savePath,
+      appId: 'com.ryan.anymex',
+    );
     if (result['isSuccess']) {
       _showSuccessDialog();
     } else {
@@ -433,7 +434,8 @@ class _UpdateBottomSheetState extends State<UpdateBottomSheet>
           size: 32,
         ),
         title: Text(
-            Platform.isAndroid ? 'Installation Started' : 'Download Complete'),
+          Platform.isAndroid ? 'Installation Started' : 'Download Complete',
+        ),
         content: Text(
           Platform.isAndroid
               ? 'Please follow the installation prompts to update the app.'
@@ -465,21 +467,16 @@ class _UpdateBottomSheetState extends State<UpdateBottomSheet>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Header with gradient
+          // Header with solid dark surface
           Container(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  colorScheme.primaryContainer,
-                  colorScheme.secondaryContainer,
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+            decoration: const BoxDecoration(
+              color: Color(0xFF10121A),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              border: Border(
+                bottom: BorderSide(color: Color(0xFF1E212D), width: 1.0),
               ),
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(28)),
             ),
             child: Column(
               children: [
@@ -490,7 +487,7 @@ class _UpdateBottomSheetState extends State<UpdateBottomSheet>
                     child: Icon(
                       Icons.system_update,
                       size: 48,
-                      color: colorScheme.primary,
+                      color: AppColors.lightBronze,
                     ),
                   ),
                 ),
@@ -499,22 +496,24 @@ class _UpdateBottomSheetState extends State<UpdateBottomSheet>
                   'Update Available',
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: colorScheme.onPrimaryContainer,
+                    color: AppColors.almondSilk,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
-                    color: colorScheme.primary.withOpacity(0.1),
+                    color: AppColors.black.withValues(alpha: 0.4),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    'v${widget.currentVersion} → ${widget.newVersion}',
+                    'v${widget.currentVersion} \u2192 ${widget.newVersion}',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w600,
-                      color: colorScheme.primary,
+                      color: AppColors.lightBronze,
                     ),
                   ),
                 ),
@@ -531,9 +530,9 @@ class _UpdateBottomSheetState extends State<UpdateBottomSheet>
                 children: [
                   Row(
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.new_releases,
-                        color: colorScheme.primary,
+                        color: AppColors.lightBronze,
                         size: 20,
                       ),
                       const SizedBox(width: 8),
@@ -557,7 +556,7 @@ class _UpdateBottomSheetState extends State<UpdateBottomSheet>
                         color: colorScheme.surfaceContainerHigh,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: colorScheme.outline.withOpacity(0.2),
+                          color: colorScheme.outline.withValues(alpha: 0.25),
                         ),
                       ),
                       child: Markdown(
@@ -589,10 +588,12 @@ class _UpdateBottomSheetState extends State<UpdateBottomSheet>
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: colorScheme.primaryContainer.withOpacity(0.3),
+                        color: colorScheme.primaryContainer.withValues(
+                          alpha: 0.3,
+                        ),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: colorScheme.primary.withOpacity(0.3),
+                          color: colorScheme.primary.withValues(alpha: 0.3),
                         ),
                       ),
                       child: Column(
@@ -667,8 +668,9 @@ class _UpdateBottomSheetState extends State<UpdateBottomSheet>
                       Expanded(
                         flex: 2,
                         child: FilledButton(
-                          onPressed:
-                              _isDownloading ? null : _downloadAndInstall,
+                          onPressed: _isDownloading
+                              ? null
+                              : _downloadAndInstall,
                           style: FilledButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             backgroundColor: colorScheme.primary,
@@ -693,8 +695,8 @@ class _UpdateBottomSheetState extends State<UpdateBottomSheet>
                                 _isDownloading
                                     ? 'Downloading...'
                                     : Platform.isAndroid
-                                        ? 'Download & Install'
-                                        : 'Download',
+                                    ? 'Download & Install'
+                                    : 'Download',
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,

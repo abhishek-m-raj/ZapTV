@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
 
-class ChannelEntity with EquatableMixin {
+class ChannelEntity extends Equatable {
   final String id;
   final String name;
   final String image;
@@ -18,7 +18,15 @@ class ChannelEntity with EquatableMixin {
     this.licenseType,
     this.licenseKey,
   });
-  
+
   @override
-  List<Object?> get props => [id, name, image, group, streamUrl, licenseType, licenseKey];
+  List<Object?> get props => [
+    id,
+    name,
+    image,
+    group,
+    streamUrl,
+    licenseType,
+    licenseKey,
+  ];
 }

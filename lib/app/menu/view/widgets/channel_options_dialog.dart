@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:zaptv/app/home/domain/entities/channel.dart';
+import 'package:zaptv/core/theme/app_theme.dart';
 import 'package:zaptv/core/widgets/tv_focusable_button.dart';
 
 class ChannelOptionsDialog extends StatefulWidget {
@@ -97,11 +98,15 @@ class _ChannelOptionsDialogState extends State<ChannelOptionsDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Dialog(
-      backgroundColor: const Color(0xFF1E1E2C),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      backgroundColor: AppColors.surfaceDialog,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: const Color(0xFF1E212D),
+          width: 1.0,
+        ),
+      ),
       child: Listener(
         // Pointer (mouse click / touch tap) interactions activate immediately
         onPointerDown: (_) => _enableActivation(),
@@ -135,24 +140,26 @@ class _ChannelOptionsDialogState extends State<ChannelOptionsDialog> {
                       height: 64,
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.white10,
+                        color: const Color(0xFF10121A),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white12),
+                        border: Border.all(
+                          color: const Color(0xFF1E212D),
+                        ),
                       ),
                       child: CachedNetworkImage(
                         imageUrl: widget.channel.image,
                         fit: BoxFit.contain,
                         memCacheWidth: 150,
                         fadeInDuration: const Duration(milliseconds: 150),
-                        placeholder: (context, url) => const Icon(
+                        placeholder: (context, url) => Icon(
                           Icons.tv,
                           size: 32,
-                          color: Colors.white24,
+                          color: AppColors.claySoil.withValues(alpha: 0.5),
                         ),
-                        errorWidget: (context, url, error) => const Icon(
+                        errorWidget: (context, url, error) => Icon(
                           Icons.tv,
                           size: 32,
-                          color: Colors.white24,
+                          color: AppColors.claySoil.withValues(alpha: 0.5),
                         ),
                       ),
                     ),
@@ -163,9 +170,11 @@ class _ChannelOptionsDialogState extends State<ChannelOptionsDialog> {
                         children: [
                           Text(
                             widget.channel.name,
-                            style: theme.textTheme.titleLarge?.copyWith(
+                            style: const TextStyle(
+                              fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                              color: AppColors.almondSilk,
+                              letterSpacing: 0.2,
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -179,15 +188,19 @@ class _ChannelOptionsDialogState extends State<ChannelOptionsDialog> {
                                   vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: theme.colorScheme.primary,
+                                  color: const Color(0xFF10121A),
                                   borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(
+                                    color: const Color(0xFF1E212D),
+                                  ),
                                 ),
                                 child: const Text(
                                   "LIVE",
                                   style: TextStyle(
-                                    fontWeight: FontWeight.bold,
+                                    fontWeight: FontWeight.w900,
                                     fontSize: 10,
-                                    color: Colors.white,
+                                    color: AppColors.almondSilk,
+                                    letterSpacing: 0.5,
                                   ),
                                 ),
                               ),
@@ -195,8 +208,10 @@ class _ChannelOptionsDialogState extends State<ChannelOptionsDialog> {
                               Expanded(
                                 child: Text(
                                   widget.channel.group,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: Colors.white60,
+                                  style: const TextStyle(
+                                    color: AppColors.lightBronze,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -209,19 +224,20 @@ class _ChannelOptionsDialogState extends State<ChannelOptionsDialog> {
                   ],
                 ),
                 const SizedBox(height: 20),
-                const Divider(color: Colors.white12),
+                Divider(color: const Color(0xFF1E212D)),
                 const SizedBox(height: 16),
                 // Favorite Button
                 TvFocusableButton(
                   focusNode: _favButtonFocusNode,
                   onPressed: _handleToggleFavorite,
                   icon: Icon(
-                    _isFavorite ? Icons.star : Icons.star_border,
-                    color: Colors.amber,
+                    _isFavorite
+                        ? Icons.star_rounded
+                        : Icons.star_outline_rounded,
+                    color: AppColors.lightBronze,
                   ),
                   label: Text(
                     _isFavorite ? "Remove from Favorites" : "Add to Favorites",
-                    style: const TextStyle(color: Colors.white),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -229,11 +245,8 @@ class _ChannelOptionsDialogState extends State<ChannelOptionsDialog> {
                 TvFocusableButton(
                   focusNode: _playButtonFocusNode,
                   onPressed: _handlePlay,
-                  icon: const Icon(Icons.play_arrow, color: Colors.white),
-                  label: const Text(
-                    "Play Channel",
-                    style: TextStyle(color: Colors.white),
-                  ),
+                  icon: const Icon(Icons.play_arrow_rounded),
+                  label: const Text("Play Channel"),
                 ),
               ],
             ),

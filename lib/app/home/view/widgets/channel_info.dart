@@ -1,14 +1,12 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:zaptv/app/home/domain/entities/channel.dart';
+import 'package:zaptv/core/theme/app_theme.dart';
 
 class ChannelInfo extends StatelessWidget {
   final ChannelEntity currentChannel;
 
-  const ChannelInfo({
-    super.key,
-    required this.currentChannel
-  });
+  const ChannelInfo({super.key, required this.currentChannel});
 
   String _formatTime(DateTime time) {
     int hour = time.hour;
@@ -34,13 +32,13 @@ class ChannelInfo extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              Colors.black.withValues(alpha: 0.95),
-              Colors.black.withValues(alpha: 0.7),
+              AppColors.black.withValues(alpha: 0.95),
+              AppColors.black.withValues(alpha: 0.70),
               Colors.transparent,
             ],
             begin: Alignment.bottomCenter,
             end: Alignment.topCenter,
-          )
+          ),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
@@ -58,14 +56,18 @@ class ChannelInfo extends StatelessWidget {
                     color: Colors.black.withValues(alpha: 0.5),
                     blurRadius: 10,
                     spreadRadius: 2,
-                  )
-                ]
+                  ),
+                ],
               ),
               child: CachedNetworkImage(
                 imageUrl: currentChannel.image,
                 fit: BoxFit.contain,
-                placeholder: (context, url) => const Icon(Icons.tv, size: 40, color: Colors.grey),
-                errorWidget: (context, url, error) => const Icon(Icons.tv, size: 40, color: Colors.grey),
+                memCacheWidth: 200,
+                fadeInDuration: const Duration(milliseconds: 150),
+                placeholder: (context, url) =>
+                    const Icon(Icons.tv, size: 40, color: Colors.grey),
+                errorWidget: (context, url, error) =>
+                    const Icon(Icons.tv, size: 40, color: Colors.grey),
               ),
             ),
             const SizedBox(width: 30),
@@ -75,44 +77,57 @@ class ChannelInfo extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.end,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primary,
-                      borderRadius: BorderRadius.circular(4),
+                  if (currentChannel.group.isNotEmpty) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.richMahogany,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: AppColors.claySoil.withValues(alpha: 0.5),
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        currentChannel.group.toUpperCase(),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          color: AppColors.almondSilk,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
                     ),
-                    child: Text(
-                      currentChannel.group.toUpperCase(),
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
+                    const SizedBox(height: 8),
+                  ],
                   Text(
                     currentChannel.name,
                     style: theme.textTheme.displaySmall?.copyWith(
-                      color: Colors.white,
+                      color: AppColors.almondSilk,
                       fontWeight: FontWeight.bold,
-                      shadows: [
-                        const Shadow(
-                          color: Colors.black87,
-                          blurRadius: 4,
-                        )
-                      ]
+                      shadows: const [
+                        Shadow(color: Colors.black87, blurRadius: 4),
+                      ],
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
-                  Text(
+                  const Text(
                     "Now Playing",
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      color: Colors.white70,
+                    style: TextStyle(
+                      color: AppColors.lightBronze,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
                     ),
-                  )
+                  ),
                 ],
               ),
             ),
-            // Time
+            // Time & LIVE
             Column(
               mainAxisAlignment: MainAxisAlignment.end,
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -120,7 +135,7 @@ class ChannelInfo extends StatelessWidget {
                 Text(
                   timeString,
                   style: theme.textTheme.headlineMedium?.copyWith(
-                    color: Colors.white,
+                    color: AppColors.almondSilk,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -133,12 +148,12 @@ class ChannelInfo extends StatelessWidget {
                     letterSpacing: 2,
                     fontSize: 16,
                   ),
-                )
+                ),
               ],
-            )
+            ),
           ],
         ),
-      )
+      ),
     );
   }
 }

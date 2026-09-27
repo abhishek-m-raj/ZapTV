@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:zaptv/core/theme/app_theme.dart';
 
 class CollapsibleSidebar extends StatefulWidget {
   final int selectedCategoryIndex;
@@ -69,6 +70,13 @@ class CollapsibleSidebarState extends State<CollapsibleSidebar> {
 
   @override
   void dispose() {
+    allCategoryFocusNode.removeListener(_checkFocusState);
+    favCategoryFocusNode.removeListener(_checkFocusState);
+    jioCategoryFocusNode.removeListener(_checkFocusState);
+    iptvCategoryFocusNode.removeListener(_checkFocusState);
+    jioLoginFocusNode.removeListener(_checkFocusState);
+    settingsFocusNode.removeListener(_checkFocusState);
+
     allCategoryFocusNode.dispose();
     favCategoryFocusNode.dispose();
     jioCategoryFocusNode.dispose();
@@ -113,14 +121,14 @@ class CollapsibleSidebarState extends State<CollapsibleSidebar> {
 
   @override
   Widget build(BuildContext context) {
-    final isExpanded = _isSidebarFocused;
-    final width = isExpanded ? 240.0 : 76.0;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeOutCubic,
-      width: width,
-      color: const Color(0xFF10121A),
+    return Container(
+      width: 240.0,
+      decoration: const BoxDecoration(
+        color: AppColors.black,
+        border: Border(
+          right: BorderSide(color: Color(0xFF161822), width: 1.0),
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -131,30 +139,29 @@ class CollapsibleSidebarState extends State<CollapsibleSidebar> {
             child: Row(
               children: [
                 Container(
-                  width: 44,
-                  height: 44,
+                  width: 42,
+                  height: 42,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1E2230),
-                    borderRadius: BorderRadius.circular(12),
+                    color: const Color(0xFF10121A),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF1E212D), width: 1.0),
                   ),
                   child: const Icon(
                     Icons.live_tv_rounded,
-                    color: Colors.white,
-                    size: 24,
+                    color: AppColors.lightBronze,
+                    size: 22,
                   ),
                 ),
-                if (isExpanded) ...[
-                  const SizedBox(width: 14),
-                  const Text(
-                    "ZapTV",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                    ),
+                const SizedBox(width: 14),
+                const Text(
+                  "ZapTV",
+                  style: TextStyle(
+                    color: AppColors.almondSilk,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
                   ),
-                ],
+                ),
               ],
             ),
           ),
@@ -167,7 +174,6 @@ class CollapsibleSidebarState extends State<CollapsibleSidebar> {
             label: "All Channels",
             count: widget.allCount,
             isSelected: widget.selectedCategoryIndex == 0,
-            isExpanded: isExpanded,
             onSelect: () => widget.onCategorySelected(0),
             onExitRight: () => widget.onExitRightFromCategory(0),
             onMoveUp: () => settingsFocusNode.requestFocus(),
@@ -180,7 +186,6 @@ class CollapsibleSidebarState extends State<CollapsibleSidebar> {
             label: "Favorites",
             count: widget.favoritesCount,
             isSelected: widget.selectedCategoryIndex == 1,
-            isExpanded: isExpanded,
             onSelect: () => widget.onCategorySelected(1),
             onExitRight: () => widget.onExitRightFromCategory(1),
             onMoveUp: () => allCategoryFocusNode.requestFocus(),
@@ -193,7 +198,6 @@ class CollapsibleSidebarState extends State<CollapsibleSidebar> {
             label: "JioTV",
             count: widget.jioCount,
             isSelected: widget.selectedCategoryIndex == 2,
-            isExpanded: isExpanded,
             onSelect: () => widget.onCategorySelected(2),
             onExitRight: () => widget.onExitRightFromCategory(2),
             onMoveUp: () => favCategoryFocusNode.requestFocus(),
@@ -206,7 +210,6 @@ class CollapsibleSidebarState extends State<CollapsibleSidebar> {
             label: "IPTV",
             count: widget.iptvCount,
             isSelected: widget.selectedCategoryIndex == 3,
-            isExpanded: isExpanded,
             onSelect: () => widget.onCategorySelected(3),
             onExitRight: () => widget.onExitRightFromCategory(3),
             onMoveUp: () => jioCategoryFocusNode.requestFocus(),
@@ -227,8 +230,7 @@ class CollapsibleSidebarState extends State<CollapsibleSidebar> {
               focusNode: jioLoginFocusNode,
               icon: Icons.login_rounded,
               label: "JioTV Login",
-              isExpanded: isExpanded,
-              accentColor: Colors.amber.shade400,
+              accentColor: AppColors.lightBronze,
               onPressed: widget.onJioLoginPressed,
               onExitRight: widget.onExitRightFromAction,
               onMoveUp: () => iptvCategoryFocusNode.requestFocus(),
@@ -241,7 +243,6 @@ class CollapsibleSidebarState extends State<CollapsibleSidebar> {
             focusNode: settingsFocusNode,
             icon: Icons.settings_rounded,
             label: "Settings",
-            isExpanded: isExpanded,
             onPressed: widget.onSettingsPressed,
             onExitRight: widget.onExitRightFromAction,
             onMoveUp: () {
@@ -266,7 +267,6 @@ class _SidebarCategoryItem extends StatefulWidget {
   final String label;
   final int count;
   final bool isSelected;
-  final bool isExpanded;
   final VoidCallback onSelect;
   final VoidCallback onExitRight;
   final VoidCallback onMoveUp;
@@ -278,7 +278,6 @@ class _SidebarCategoryItem extends StatefulWidget {
     required this.label,
     required this.count,
     required this.isSelected,
-    required this.isExpanded,
     required this.onSelect,
     required this.onExitRight,
     required this.onMoveUp,
@@ -316,7 +315,38 @@ class _SidebarCategoryItemState extends State<_SidebarCategoryItem> {
 
   @override
   Widget build(BuildContext context) {
-    final active = widget.isSelected || _isFocused;
+    Color bg;
+    Color fg;
+    Color iconColor;
+    Color countBg;
+    Color countFg;
+    Border? border;
+
+    if (_isFocused) {
+      bg = AppColors.lightBronze;
+      fg = AppColors.black;
+      iconColor = AppColors.black;
+      countBg = AppColors.black.withValues(alpha: 0.18);
+      countFg = AppColors.black;
+      border = Border.all(color: AppColors.almondSilk, width: 1.5);
+    } else if (widget.isSelected) {
+      bg = const Color(0xFF12141D);
+      fg = AppColors.almondSilk;
+      iconColor = AppColors.lightBronze;
+      countBg = const Color(0xFF1B1E2B);
+      countFg = AppColors.lightBronze;
+      border = Border.all(
+        color: AppColors.lightBronze.withValues(alpha: 0.35),
+        width: 1.0,
+      );
+    } else {
+      bg = Colors.transparent;
+      fg = AppColors.almondSilk.withValues(alpha: 0.65);
+      iconColor = AppColors.lightBronze.withValues(alpha: 0.45);
+      countBg = const Color(0xFF10121A);
+      countFg = AppColors.almondSilk.withValues(alpha: 0.45);
+      border = null;
+    }
 
     return Focus(
       focusNode: widget.focusNode,
@@ -332,7 +362,9 @@ class _SidebarCategoryItemState extends State<_SidebarCategoryItem> {
             widget.onMoveDown();
             return KeyEventResult.handled;
           } else if (event.logicalKey == LogicalKeyboardKey.select ||
-              event.logicalKey == LogicalKeyboardKey.enter) {
+              event.logicalKey == LogicalKeyboardKey.enter ||
+              event.logicalKey == LogicalKeyboardKey.space ||
+              event.logicalKey == LogicalKeyboardKey.gameButtonA) {
             widget.onSelect();
             widget.onExitRight();
             return KeyEventResult.handled;
@@ -349,66 +381,45 @@ class _SidebarCategoryItemState extends State<_SidebarCategoryItem> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           margin: const EdgeInsets.symmetric(horizontal: 10),
-          padding: EdgeInsets.symmetric(
-            horizontal: widget.isExpanded ? 14 : 16,
-            vertical: 12,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color: _isFocused
-                ? Colors.white
-                : (widget.isSelected
-                      ? Colors.white.withValues(alpha: 0.1)
-                      : Colors.transparent),
-            borderRadius: BorderRadius.circular(10),
+            color: bg,
+            borderRadius: BorderRadius.circular(8),
+            border: border,
           ),
           child: Row(
             children: [
-              Icon(
-                widget.icon,
-                color: _isFocused
-                    ? const Color(0xFF101114)
-                    : (active ? Colors.white : Colors.white60),
-                size: 22,
+              Icon(widget.icon, color: iconColor, size: 22),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  widget.label,
+                  style: TextStyle(
+                    color: fg,
+                    fontSize: 14,
+                    fontWeight: _isFocused || widget.isSelected
+                        ? FontWeight.bold
+                        : FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.clip,
+                ),
               ),
-              if (widget.isExpanded) ...[
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Text(
-                    widget.label,
-                    style: TextStyle(
-                      color: _isFocused
-                          ? const Color(0xFF101114)
-                          : (active ? Colors.white : Colors.white70),
-                      fontSize: 14,
-                      fontWeight: active ? FontWeight.bold : FontWeight.w500,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.clip,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: countBg,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  "${widget.count}",
+                  style: TextStyle(
+                    color: countFg,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 7,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _isFocused
-                        ? const Color(0xFF101114).withValues(alpha: 0.1)
-                        : Colors.white.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    "${widget.count}",
-                    style: TextStyle(
-                      color: _isFocused
-                          ? const Color(0xFF101114)
-                          : Colors.white60,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ],
           ),
         ),
@@ -421,7 +432,6 @@ class _SidebarActionButton extends StatefulWidget {
   final FocusNode focusNode;
   final IconData icon;
   final String label;
-  final bool isExpanded;
   final Color? accentColor;
   final VoidCallback onPressed;
   final VoidCallback onExitRight;
@@ -432,7 +442,6 @@ class _SidebarActionButton extends StatefulWidget {
     required this.focusNode,
     required this.icon,
     required this.label,
-    required this.isExpanded,
     this.accentColor,
     required this.onPressed,
     required this.onExitRight,
@@ -469,8 +478,8 @@ class _SidebarActionButtonState extends State<_SidebarActionButton> {
   @override
   Widget build(BuildContext context) {
     final fg = _isFocused
-        ? const Color(0xFF101114)
-        : (widget.accentColor ?? Colors.white70);
+        ? AppColors.black
+        : (widget.accentColor ?? AppColors.almondSilk.withValues(alpha: 0.75));
 
     return Focus(
       focusNode: widget.focusNode,
@@ -501,34 +510,33 @@ class _SidebarActionButtonState extends State<_SidebarActionButton> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           margin: const EdgeInsets.symmetric(horizontal: 10),
-          padding: EdgeInsets.symmetric(
-            horizontal: widget.isExpanded ? 14 : 16,
-            vertical: 12,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color: _isFocused
-                ? Colors.white
-                : Colors.white.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(10),
+            color: _isFocused ? AppColors.lightBronze : const Color(0xFF10121A),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: _isFocused
+                  ? AppColors.almondSilk
+                  : const Color(0xFF1C1E2A),
+              width: _isFocused ? 1.5 : 1.0,
+            ),
           ),
           child: Row(
             children: [
               Icon(widget.icon, color: fg, size: 22),
-              if (widget.isExpanded) ...[
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Text(
-                    widget.label,
-                    style: TextStyle(
-                      color: fg,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.clip,
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  widget.label,
+                  style: TextStyle(
+                    color: fg,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.clip,
                 ),
-              ],
+              ),
             ],
           ),
         ),

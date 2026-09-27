@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:custom_tv_text_field/custom_tv_text_field.dart';
+import 'package:zaptv/core/theme/app_theme.dart';
 
 class CustomTvTextField extends StatefulWidget {
   final TextEditingController controller;
@@ -35,11 +36,13 @@ class _CustomTvTextFieldState extends State<CustomTvTextField> {
     KeyboardType kbType = KeyboardType.alphabetic;
     TextFieldType tfType = TextFieldType.other;
 
-    if (widget.keyboardType == TextInputType.number || widget.keyboardType == TextInputType.phone) {
+    if (widget.keyboardType == TextInputType.number ||
+        widget.keyboardType == TextInputType.phone) {
       kbType = KeyboardType.numeric;
     }
-    
-    if (widget.labelText.toLowerCase().contains("phone") || widget.labelText.toLowerCase().contains("mobile")) {
+
+    if (widget.labelText.toLowerCase().contains("phone") ||
+        widget.labelText.toLowerCase().contains("mobile")) {
       tfType = TextFieldType.phone;
     }
 
@@ -50,13 +53,20 @@ class _CustomTvTextFieldState extends State<CustomTvTextField> {
       isFocused: widget.isFocused,
       keyboardType: kbType,
       textFieldType: tfType,
-      backgroundColor: Colors.grey[900],
-      focusedBorderColor: Theme.of(context).colorScheme.primary,
+      backgroundColor: AppColors.surfaceElevated,
+      focusedBorderColor: AppColors.lightBronze,
       borderRadius: 12,
-      prefixIcon: widget.prefixText.isNotEmpty 
+      prefixIcon: widget.prefixText.isNotEmpty
           ? Container(
-              padding: const EdgeInsets.only(left: 8.0, right: 4.0, top: 14.0),
-              child: Text(widget.prefixText, style: const TextStyle(color: Colors.white70, fontSize: 16)),
+              padding: const EdgeInsets.only(left: 12.0, right: 4.0, top: 14.0),
+              child: Text(
+                widget.prefixText,
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             )
           : null,
     );
