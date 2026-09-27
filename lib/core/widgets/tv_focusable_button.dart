@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class TvFocusableButton extends StatefulWidget {
   final VoidCallback onPressed;
@@ -78,64 +79,82 @@ class _TvFocusableButtonState extends State<TvFocusableButton> {
       }
     }
 
-    return InkWell(
-      focusNode: widget.focusNode,
-      autofocus: widget.autofocus,
-      onTap: widget.onPressed,
-      onFocusChange: (focusValue) {
-        setState(() {
-          _isFocused = focusValue;
-        });
+    return Shortcuts(
+      shortcuts: <ShortcutActivator, Intent>{
+        const SingleActivator(LogicalKeyboardKey.enter, includeRepeats: false):
+            const ActivateIntent(),
+        const SingleActivator(
+          LogicalKeyboardKey.numpadEnter,
+          includeRepeats: false,
+        ): const ActivateIntent(),
+        const SingleActivator(LogicalKeyboardKey.select, includeRepeats: false):
+            const ActivateIntent(),
+        const SingleActivator(LogicalKeyboardKey.space, includeRepeats: false):
+            const ActivateIntent(),
+        const SingleActivator(
+          LogicalKeyboardKey.gameButtonA,
+          includeRepeats: false,
+        ): const ActivateIntent(),
       },
-      borderRadius: BorderRadius.circular(widget.borderRadius),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        curve: Curves.easeOutCubic,
-        transform: Matrix4.diagonal3Values(
-          hasFocus ? 1.02 : 1.0,
-          hasFocus ? 1.02 : 1.0,
-          1.0,
-        ),
-        padding:
-            widget.padding ??
-            const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(widget.borderRadius),
-          border: Border.all(color: border, width: hasFocus ? 2.0 : 1.0),
-          boxShadow: hasFocus
-              ? [
-                  BoxShadow(
-                    color: widget.isJioLoggedIn
-                        ? Colors.green.withValues(alpha: 0.35)
-                        : Colors.white.withValues(alpha: 0.2),
-                    blurRadius: 10,
-                    spreadRadius: 1,
-                  ),
-                ]
-              : [],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (widget.icon != null) ...[
-              IconTheme(
-                data: IconThemeData(color: fg, size: 20),
-                child: widget.icon!,
+      child: InkWell(
+        focusNode: widget.focusNode,
+        autofocus: widget.autofocus,
+        onTap: widget.onPressed,
+        onFocusChange: (focusValue) {
+          setState(() {
+            _isFocused = focusValue;
+          });
+        },
+        borderRadius: BorderRadius.circular(widget.borderRadius),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOutCubic,
+          transform: Matrix4.diagonal3Values(
+            hasFocus ? 1.02 : 1.0,
+            hasFocus ? 1.02 : 1.0,
+            1.0,
+          ),
+          padding:
+              widget.padding ??
+              const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(widget.borderRadius),
+            border: Border.all(color: border, width: hasFocus ? 2.0 : 1.0),
+            boxShadow: hasFocus
+                ? [
+                    BoxShadow(
+                      color: widget.isJioLoggedIn
+                          ? Colors.green.withValues(alpha: 0.35)
+                          : Colors.white.withValues(alpha: 0.2),
+                      blurRadius: 10,
+                      spreadRadius: 1,
+                    ),
+                  ]
+                : [],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (widget.icon != null) ...[
+                IconTheme(
+                  data: IconThemeData(color: fg, size: 20),
+                  child: widget.icon!,
+                ),
+                const SizedBox(width: 10),
+              ],
+              DefaultTextStyle(
+                style: TextStyle(
+                  color: fg,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  letterSpacing: 0.2,
+                ),
+                child: widget.label,
               ),
-              const SizedBox(width: 10),
             ],
-            DefaultTextStyle(
-              style: TextStyle(
-                color: fg,
-                fontWeight: FontWeight.bold,
-                fontSize: 15,
-                letterSpacing: 0.2,
-              ),
-              child: widget.label,
-            ),
-          ],
+          ),
         ),
       ),
     );
