@@ -102,10 +102,7 @@ class _ChannelOptionsDialogState extends State<ChannelOptionsDialog> {
       backgroundColor: AppColors.surfaceDialog,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: const Color(0xFF1E212D),
-          width: 1.0,
-        ),
+        side: BorderSide(color: const Color(0xFF1E212D), width: 1.0),
       ),
       child: Listener(
         // Pointer (mouse click / touch tap) interactions activate immediately
@@ -142,9 +139,7 @@ class _ChannelOptionsDialogState extends State<ChannelOptionsDialog> {
                       decoration: BoxDecoration(
                         color: const Color(0xFF10121A),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: const Color(0xFF1E212D),
-                        ),
+                        border: Border.all(color: const Color(0xFF1E212D)),
                       ),
                       child: CachedNetworkImage(
                         imageUrl: widget.channel.image,
@@ -234,7 +229,6 @@ class _ChannelOptionsDialogState extends State<ChannelOptionsDialog> {
                     _isFavorite
                         ? Icons.star_rounded
                         : Icons.star_outline_rounded,
-                    color: AppColors.lightBronze,
                   ),
                   label: Text(
                     _isFavorite ? "Remove from Favorites" : "Add to Favorites",

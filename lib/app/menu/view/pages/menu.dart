@@ -6,11 +6,9 @@ import 'package:flutter/services.dart';
 import 'package:zaptv/app/home/domain/entities/channel.dart';
 import 'package:zaptv/app/menu/view/widgets/channel_options_dialog.dart';
 import 'package:zaptv/app/menu/view/widgets/collapsible_sidebar.dart';
-import 'package:zaptv/app/menu/view/widgets/jiotv_login_dialog.dart';
 import 'package:zaptv/app/settings/view/pages/settings_page.dart';
 import 'package:zaptv/core/config/locator.dart';
 import 'package:zaptv/core/services/hive_db.dart';
-import 'package:zaptv/core/services/jiotvgo_process_service.dart';
 import 'package:zaptv/core/theme/app_theme.dart';
 
 class MenuPage extends StatefulWidget {
@@ -45,7 +43,6 @@ class _MenuPageState extends State<MenuPage> {
       GlobalKey<CollapsibleSidebarState>();
 
   late ChannelEntity currentChannel;
-  bool _isJioLoggedIn = false;
   late int _selectedCategoryIndex; // 0: All, 1: Favorites, 2: JioTV, 3: IPTV
   final HiveDb _hiveDb = loc<HiveDb>();
 
@@ -90,8 +87,6 @@ class _MenuPageState extends State<MenuPage> {
 
     _emptyStateFocusNode = FocusNode(debugLabel: 'GridEmptyState');
 
-    _checkJioLoginStatus();
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         setState(() {
@@ -131,18 +126,6 @@ class _MenuPageState extends State<MenuPage> {
     } else {
       _displayedChannels = _allChannels;
     }
-  }
-
-  Future<void> _checkJioLoginStatus() async {
-    try {
-      final service = loc<JiotvGoProcessService>();
-      final loggedIn = await service.isLoggedIn();
-      if (mounted) {
-        setState(() {
-          _isJioLoggedIn = loggedIn;
-        });
-      }
-    } catch (_) {}
   }
 
   bool _isFavorite(ChannelEntity channel) {
@@ -198,7 +181,12 @@ class _MenuPageState extends State<MenuPage> {
       _selectedCategoryIndex = index;
       _updateDisplayedChannels();
       if (_displayedChannels.isNotEmpty) {
-        _focusedChannelNotifier.value = _displayedChannels.first;
+        final hasCurrent =
+            _displayedChannels.any((c) => c.id == currentChannel.id);
+        _focusedChannelNotifier.value =
+            hasCurrent ? currentChannel : _displayedChannels.first;
+      } else {
+        _focusedChannelNotifier.value = null;
       }
     });
   }
@@ -229,26 +217,24 @@ class _MenuPageState extends State<MenuPage> {
       return;
     }
 
-    // 1. Try active previewed channel if it exists in the displayed channels
-    final active = _focusedChannelNotifier.value;
-    if (active != null && _displayedChannels.any((c) => c.id == active.id)) {
-      final node = _tileFocusNodes[active.id];
-      if (node != null && node.canRequestFocus && node.context != null) {
-        node.requestFocus();
-        return;
-      }
-    }
+    final active = _focusedChannelNotifier.value ?? currentChannel;
+    final target = _displayedChannels.any((c) => c.id == active.id)
+        ? active
+        : _displayedChannels.first;
 
-    // 2. Otherwise focus first channel in list
-    final first = _displayedChannels.first;
-    final firstNode = _getTileFocusNode(first.id);
-    if (firstNode.canRequestFocus && firstNode.context != null) {
-      firstNode.requestFocus();
-      _focusedChannelNotifier.value = first;
+    final targetNode = _getTileFocusNode(target.id);
+    if (targetNode.canRequestFocus && targetNode.context != null) {
+      targetNode.requestFocus();
+      _focusedChannelNotifier.value = target;
     } else {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        if (firstNode.canRequestFocus && firstNode.context != null) {
+        if (targetNode.canRequestFocus && targetNode.context != null) {
+          targetNode.requestFocus();
+          _focusedChannelNotifier.value = target;
+        } else {
+          final first = _displayedChannels.first;
+          final firstNode = _getTileFocusNode(first.id);
           firstNode.requestFocus();
           _focusedChannelNotifier.value = first;
         }
@@ -259,7 +245,6 @@ class _MenuPageState extends State<MenuPage> {
   @override
   Widget build(BuildContext context) {
     final displayed = _displayedChannels;
-    final favoritesCount = widget.channels.where((c) => _isFavorite(c)).length;
 
     return PopScope(
       canPop: !_isSidebarOpen,
@@ -279,11 +264,6 @@ class _MenuPageState extends State<MenuPage> {
             CollapsibleSidebar(
               key: _sidebarKey,
               selectedCategoryIndex: _selectedCategoryIndex,
-              allCount: _allChannels.length,
-              favoritesCount: favoritesCount,
-              jioCount: _jioChannels.length,
-              iptvCount: _iptvChannels.length,
-              isJioLoggedIn: _isJioLoggedIn,
               onExpansionChanged: (open) {
                 if (_isSidebarOpen != open) {
                   setState(() => _isSidebarOpen = open);
@@ -296,29 +276,17 @@ class _MenuPageState extends State<MenuPage> {
               onExitRightFromAction: () {
                 _exitSidebarToGrid();
               },
-              onJioLoginPressed: () async {
-                final result = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => const JiotvLoginDialog(),
-                );
-                if (result == true) {
-                  _checkJioLoginStatus();
-                  widget.onJioLoginSuccess?.call();
-                }
-              },
               onSettingsPressed: () async {
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => SettingsPage(
                       onJioLoginSuccess: () {
-                        _checkJioLoginStatus();
                         widget.onJioLoginSuccess?.call();
                       },
                     ),
                   ),
                 );
-                _checkJioLoginStatus();
               },
             ),
 

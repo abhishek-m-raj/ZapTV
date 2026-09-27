@@ -302,7 +302,7 @@ class _SettingsPageState extends State<SettingsPage> {
         const _SectionHeader(
           title: "JioTV Integration",
           subtitle:
-              "Connect your Jio mobile account to unlock live TV channels with local FFI streaming.",
+              "Connect your Jio mobile account to unlock live TV channels.",
         ),
         const SizedBox(height: 28),
         if (_checkingJio)
@@ -414,7 +414,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           const SizedBox(height: 8),
                           Text(
                             _isJioLoggedIn
-                                ? "Authenticated successfully. JioTV live channels are active in your playlist and streaming locally via FFI on port 5050."
+                                ? "Authenticated successfully. JioTV live channels are active in your playlist."
                                 : "Log in using your Jio phone number to access full live channels, sports broadcasts, and regional networks.",
                             style: TextStyle(
                               color: AppColors.textSecondary,
